@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <rect width="64" height="64" fill="#000000"/>
+  <text x="6" y="48" font-family="Impact,'Arial Narrow Bold',sans-serif" font-size="46" fill="#F2EFE9">5</text>
+  <path transform="translate(34 22) scale(0.26)" fill="#910005"
+        d="M50 3 L60.87 35.03 L94.7 35.48 L67.59 55.72 L77.62 88.02 L50 68.5 L22.38 88.02 L32.41 55.72 L5.3 35.48 L39.13 35.03 Z"/>
+</svg>
