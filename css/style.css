@@ -618,6 +618,35 @@ html.has-grain .grain{
 }
 
 /* =========================================================
+   RENDIMIENTO — saltear el render de lo que no está en pantalla
+
+   content-visibility:auto le deja al navegador saltear layout y pintado de
+   las secciones fuera del viewport. contain-intrinsic-size:auto reserva el
+   alto real de la última vez que se pintó, así que la barra de scroll no
+   salta y ScrollTrigger sigue midiendo bien.
+
+   NO se aplica a .reel ni a .marquee: el reel está fijado todo el tramo y
+   el marquee corre en bucle aunque esté fuera de cuadro.
+   ========================================================= */
+.hero,
+.contact{
+  content-visibility:auto;
+  contain-intrinsic-size:auto 100vh;
+}
+
+/* La constelación sólo puede contenerse cuando NO está fijada.
+   content-visibility implica `contain:paint`, y el paint containment
+   convierte al elemento en bloque contenedor de sus descendientes
+   position:fixed — que es exactamente como ScrollTrigger fija .constel__pin
+   sobre el scroller del body. Con la órbita activa (html.js-constel) el pin
+   quedaría anclado a la sección en vez de al viewport y se rompería.
+   En apilado no hay pin, que además es el modo de los equipos lentos. */
+html:not(.js-constel) .constel{
+  content-visibility:auto;
+  contain-intrinsic-size:auto 100vh;
+}
+
+/* =========================================================
    ESTADOS INICIALES CONTROLADOS POR JS
    ========================================================= */
 .ch-mask{padding-top:.18em;margin-top:-.18em}
