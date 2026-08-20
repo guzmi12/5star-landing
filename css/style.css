@@ -119,6 +119,18 @@ body.is-loading{overflow:hidden;height:100%}
   line-height:1;
   color:var(--bone);
 }
+/* Doble exposición: el mismo número corrido y en bordó sobre el original,
+   ~100 ms justo antes de que reviente. */
+.preloader__ghost{
+  position:absolute;
+  font-family:var(--display);
+  font-size:clamp(1rem,2vw,1.5rem);
+  line-height:1;
+  color:var(--bordeaux);
+  mix-blend-mode:screen;
+  opacity:0;
+  pointer-events:none;
+}
 .preloader__flare{
   position:absolute;width:130%;aspect-ratio:1;border-radius:50%;
   background:radial-gradient(circle,rgba(255,236,230,.95) 0%,rgba(145,0,5,.55) 35%,transparent 70%);

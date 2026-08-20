@@ -205,6 +205,96 @@
     doc.classList.add('has-grain');
   }
 
+  /* ---------------------------------------------------------------------
+     ESTALLIDO DE TIZA — el número revienta en polvo de marcador.
+     Canvas 2D liviano, sin librerías: se dibuja encima de todo, vive lo que
+     dura el estallido y se destruye solo liberando ticker y nodo.
+     --------------------------------------------------------------------- */
+  function chalkBurst(originEl, count, life) {
+    if (REDUCED) return;
+
+    var canvas = document.createElement('canvas');
+    var ctx = canvas.getContext && canvas.getContext('2d');
+    if (!ctx) return;                       // sin contexto 2D no hay estallido y nada rompe
+
+    var W = window.innerWidth, H = window.innerHeight;
+    if (!(W > 0 && H > 0)) return;          // un canvas de 0px tira errores al dibujar
+
+    var dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = Math.round(W * dpr);
+    canvas.height = Math.round(H * dpr);
+    // Por encima del preloader (z-index 100): el polvo tiene que verse
+    // mientras la cortina negra todavía está puesta.
+    canvas.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;z-index:101;pointer-events:none';
+    canvas.setAttribute('aria-hidden', 'true');
+    ctx.scale(dpr, dpr);
+
+    // El polvo sale del centro del propio número
+    var ox = W / 2, oy = H / 2;
+    if (originEl) {
+      var r = originEl.getBoundingClientRect();
+      if (r.width || r.height) { ox = r.left + r.width / 2; oy = r.top + r.height / 2; }
+    }
+
+    var N = count || 200;
+    var LIFE = life || 1.5;
+    var parts = new Array(N);
+    for (var i = 0; i < N; i++) {
+      var a = Math.random() * Math.PI * 2;
+      var sp = 60 + Math.pow(Math.random(), 0.55) * 520;    // px/s
+      parts[i] = {
+        x: ox + (Math.random() - 0.5) * 10,
+        y: oy + (Math.random() - 0.5) * 10,
+        vx: Math.cos(a) * sp,
+        vy: Math.sin(a) * sp * 0.82,
+        r: 0.7 + Math.random() * 2.4,
+        life: LIFE * (0.45 + Math.random() * 0.55),
+        age: 0,
+        bone: Math.random() < 0.62                          // hueso mayoría, bordó el resto
+      };
+    }
+
+    document.body.appendChild(canvas);
+
+    var dead = false;
+    function destroy() {
+      if (dead) return;
+      dead = true;
+      gsap.ticker.remove(frame);
+      if (canvas.parentNode) canvas.parentNode.removeChild(canvas);
+      ctx = null; parts = null;
+    }
+
+    function frame(time, deltaTime) {
+      if (dead) return;
+      var dt = Math.min((deltaTime || 16) / 1000, 0.05);
+      ctx.clearRect(0, 0, W, H);
+      ctx.globalCompositeOperation = 'lighter';
+
+      var alive = 0;
+      for (var j = 0; j < N; j++) {
+        var p = parts[j];
+        p.age += dt;
+        if (p.age >= p.life) continue;
+        alive++;
+        p.vx *= 0.955;                        // la tiza frena en el aire
+        p.vy = p.vy * 0.955 + 220 * dt;       // y termina cayendo
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+        var k = 1 - p.age / p.life;
+        ctx.globalAlpha = k * k * 0.9;
+        ctx.fillStyle = p.bone ? '#F2EFE9' : '#910005';
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r * (0.4 + k * 0.6), 0, 6.283185);
+        ctx.fill();
+      }
+      if (!alive) destroy();
+    }
+
+    gsap.ticker.add(frame);
+    gsap.delayedCall(LIFE + 0.6, destroy);   // red de seguridad: el canvas no sobrevive
+  }
+
   /* =====================================================================
      A. PRELOADER — cinco trazos, cinco cuentas, una estrella
      ===================================================================== */
@@ -236,9 +326,24 @@
       else tl.to(leg, { opacity: 1, duration: 0.22 }, at);
     });
 
-    tl.to('.preloader__flare', { opacity: 1, scale: 1.6, duration: 0.32, ease: 'power2.out' }, 1.06)
+    // Al llegar a 1 el número se desdobla ~100 ms (doble exposición: el mismo
+    // glifo corrido y en bordó encima del original) y revienta en polvo.
+    var ghost = q('#plGhost');
+    var G = 0.90;
+    if (ghost && count) {
+      tl.set(ghost, { textContent: '1' }, G)
+        .set(ghost, { opacity: 1, x: 5, y: -3, scaleX: 1.06 }, G)
+        .set(count, { x: -4 }, G)
+        .set(ghost, { opacity: 1, x: -6, y: 2, scaleX: 0.94 }, G + 0.05)
+        .set(count, { x: 3 }, G + 0.05)
+        .set(ghost, { opacity: 0, x: 0, y: 0, scaleX: 1 }, G + 0.10)
+        .set(count, { x: 0 }, G + 0.10);
+    }
+
+    tl.add(function () { chalkBurst(count, 200, 1.5); }, G + 0.12)
+      .to('.preloader__count', { opacity: 0, scale: 1.5, duration: 0.18, ease: 'power2.out' }, G + 0.12)
+      .to('.preloader__flare', { opacity: 1, scale: 1.6, duration: 0.32, ease: 'power2.out' }, 1.06)
       .to('.preloader__star', { scale: 1.18, duration: 0.42, ease: 'power2.out' }, 1.06)
-      .to('.preloader__count', { opacity: 0, duration: 0.22 }, 1.06)
       .to('.preloader__flare', { opacity: 0, duration: 0.5, ease: 'power2.in' }, 1.34)
       .to('.preloader__label', { opacity: 0, duration: 0.3 }, 1.06)
       .to(pre, { clipPath: 'inset(0% 0% 100% 0%)', duration: 0.75, ease: 'power4.inOut' }, 1.28)
