@@ -37,20 +37,43 @@
   else LITE = REDUCED || SAVE_DATA || CORES <= 4 || (COARSE && TINY);
 
   /* ---------------------------------------------------------------------
-     2. Ventanas de servicio, medidas sobre el propio video
-        (picos de luminancia reales: 2.85s, 6.30s, 8.80s, 13.25s, 15.90s)
+     2. Ventanas de servicio, en SEGUNDOS DE VIDEO
      --------------------------------------------------------------------- */
   var VIDEO_DUR = 20;
 
-  // Medido sobre el video nuevo con ffprobe+signalstats a 8fps.
-  // Cuatro estrellas protagonistas + la UNIFICACIÓN (todas juntas -> estallido).
-  // El servicio 05 cae en la unificación, nunca antes.
+  // Cadencia v4, aprobada por Juan Pedro: los cinco servicios entran en el
+  // primer tercio (4-13 s) y el último tramo queda limpio para el final.
+  //
+  // Contrastada contra el video con ffprobe + signalstats a 8 fps
+  // (YAVG/SATAVG) y con lectura de fotogramas. Beats reales del video:
+  //   2.9  pico  una estrella llena el cuadro
+  //   4.0  pico  la estrella con dos compañeras y estelas
+  //   6.4  PICO  fogonazo blanco al cruzar (YAVG 105, el más alto del tramo)
+  //   7.8  pico  la estrella y su compañera sobre el humo
+  //   8.8  pico  la estrella más grande, centrada (meseta 8.5-9.1)
+  //  13.0  TODAS LAS ESTRELLAS JUNTAS  -> arranca la unificación
+  //  16.6  ESTALLIDO (YAVG 152, SATAVG 57: el pico absoluto del video)
+  //  18.5  lockup limpio, 5 + estrella sobre negro
+  //
+  // El servicio 05 abre la unificación en 13.0 y sale en 13.8: de ahí en más
+  // no compite nada con el estallido ni con el lockup (el rótulo de cierre
+  // entra recién en 18.10). Nunca antes de las estrellas juntas.
+  //
+  // Dos correcciones finas sobre las ventanas de referencia:
+  //   · 02 peak 6.00 -> 6.30. En 6.00 la luminancia está en un valle
+  //     (YAVG 34); el fogonazo real es 6.38. El flare arranca en peak-0.28,
+  //     así que a 6.30 el destello de la copy revienta junto con el del video.
+  //   · 03 in 6.40 -> 6.90 (= out de 02) y peak 7.00 -> 7.60. Las .svc están
+  //     absolutamente posicionadas una sobre otra: con in(03) < out(02) se
+  //     veían dos servicios sólidos encimados. Ahora cada tarjeta entra justo
+  //     cuando la anterior empieza a irse -> disolvencia, nunca pila. 7.60
+  //     además cae sobre el pico real de ese tramo (7.75-7.88).
   var WINDOWS = [
-    { in: 2.00,  peak: 2.94,  out: 4.10 },   // 01 · una estrella llena el cuadro
-    { in: 5.50,  peak: 6.38,  out: 7.40 },   // 02 · fogonazo blanco al cruzar
-    { in: 8.05,  peak: 8.75,  out: 10.40 },  // 03 · la estrella más grande, centrada
-    { in: 12.45, peak: 13.38, out: 14.35 },  // 04 · la estrella con su séquito
-    { in: 15.30, peak: 16.60, out: 16.95 }   // 05 · UNIFICACIÓN -> estallido -> lockup
+    { in: 3.20,  peak: 4.00,  out: 5.00 },   // 01 · la estrella con sus dos compañeras
+    { in: 5.20,  peak: 6.30,  out: 6.90 },   // 02 · fogonazo blanco al cruzar
+    { in: 6.90,  peak: 7.60,  out: 8.20 },   // 03 · la estrella sobre el humo
+    { in: 8.20,  peak: 9.00,  out: 9.80 },   // 04 · la estrella más grande, centrada
+    { in: 12.20, peak: 13.00, out: 13.80 }   // 05 · UNIFICACIÓN -> estallido -> lockup
   ];
 
   /* =====================================================================
@@ -346,13 +369,18 @@
       var rule = q('.svc__rule', card);
       var desc = q('.svc__desc', card);
 
+      // Las ventanas v4 son más cortas que las de v3 (la 03 dura 1.3 s contra
+      // los 2.35 s de antes): escalamos la entrada para que el título termine
+      // de formarse dentro de su propia ventana y no justo al salir.
+      var k = gsap.utils.clamp(0.62, 1, (w.out - w.in) / 1.8);
+
       tl.set(card, { autoAlpha: 1 }, w.in)
         .fromTo(num, { yPercent: 118, skewY: 8 },
-          { yPercent: 0, skewY: 0, duration: 0.75, ease: 'power4.out' }, w.in)
+          { yPercent: 0, skewY: 0, duration: 0.75 * k, ease: 'power4.out' }, w.in)
         .fromTo(title, { yPercent: 16, opacity: 0, filter: 'blur(18px)', skewY: 5 },
-          { yPercent: 0, opacity: 1, filter: 'blur(0px)', skewY: 0, duration: 1.0, ease: 'power3.out' }, w.in + 0.10)
-        .fromTo(rule, { scaleX: 0 }, { scaleX: 1, duration: 0.7, ease: 'power2.out' }, w.in + 0.30)
-        .fromTo(desc, { y: 24, opacity: 0 }, { y: 0, opacity: 1, duration: 0.7, ease: 'power2.out' }, w.in + 0.42);
+          { yPercent: 0, opacity: 1, filter: 'blur(0px)', skewY: 0, duration: 1.0 * k, ease: 'power3.out' }, w.in + 0.10 * k)
+        .fromTo(rule, { scaleX: 0 }, { scaleX: 1, duration: 0.7 * k, ease: 'power2.out' }, w.in + 0.30 * k)
+        .fromTo(desc, { y: 24, opacity: 0 }, { y: 0, opacity: 1, duration: 0.7 * k, ease: 'power2.out' }, w.in + 0.42 * k);
 
       // La estrella ilumina la copy: fogonazo + subida de brillo del video
       tl.to(flare, { opacity: 0.9, scale: 1.25, duration: 0.30, ease: 'power2.out' }, w.peak - 0.28)
