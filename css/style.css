@@ -397,22 +397,25 @@ html.js-reel .lite{display:none}
 }
 .marquee__row{overflow:hidden;will-change:transform}
 .marquee__track{display:flex;width:max-content}
+/* Tipografía 30% más grande que en v3: el marquee tiene que golpear. */
 .marquee__track span{
   display:block;white-space:nowrap;
   font-family:var(--display);
-  font-size:clamp(1.15rem,4.4vw,3.6rem);
+  font-size:clamp(1.5rem,5.7vw,4.7rem);
   line-height:1.06;
   letter-spacing:-.005em;
   text-transform:uppercase;
   padding-right:.4em;
 }
 .marquee__track b{color:var(--bordeaux);font-weight:400}
+/* La fila fantasma es puro contorno: sostiene sin competir con la de arriba */
 .marquee__row--ghost .marquee__track span{
-  font-size:clamp(.68rem,1.6vw,1.3rem);
+  font-size:clamp(.88rem,2.1vw,1.7rem);
   color:transparent;
-  -webkit-text-stroke:1px rgba(242,239,233,.42);
+  -webkit-text-stroke:1px rgba(242,239,233,.35);
   letter-spacing:.06em;
 }
+.marquee__row--ghost .marquee__track b{color:transparent}
 
 /* =========================================================
    CONSTELACIÓN 5STAR — las cinco disciplinas orbitando la estrella

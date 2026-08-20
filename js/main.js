@@ -651,6 +651,20 @@
 
     var tracks = qa('.marquee__track');
     var skewTo = gsap.quickTo(tracks, 'skewX', { duration: 0.55, ease: 'power3' });
+
+    // A alta velocidad el texto se arrastra: hasta 1px de desenfoque, con la
+    // misma inercia que el skew. filter no es numérico, así que interpolamos
+    // un proxy y escribimos el string; por debajo de 0.02px volvemos a
+    // 'none' para no dejar una capa compuesta viva de gusto.
+    var blurState = { b: 0 };
+    var blurTo = gsap.quickTo(blurState, 'b', {
+      duration: 0.5, ease: 'power3',
+      onUpdate: function () {
+        var f = blurState.b > 0.02 ? 'blur(' + blurState.b.toFixed(2) + 'px)' : 'none';
+        for (var i = 0; i < tracks.length; i++) tracks[i].style.filter = f;
+      }
+    });
+
     var speed = { s: 1 };
     var speedTo = gsap.quickTo(speed, 's', {
       duration: 0.7, ease: 'power2',
@@ -665,9 +679,10 @@
         var v = self.getVelocity();
         skewTo(gsap.utils.clamp(-10, 10, v / -190));
         speedTo(gsap.utils.clamp(1, 4.5, 1 + Math.abs(v) / 1600));
+        blurTo(gsap.utils.clamp(0, 1, Math.abs(v) / 2600));
       },
-      onLeave: function () { skewTo(0); speedTo(1); },
-      onLeaveBack: function () { skewTo(0); speedTo(1); }
+      onLeave: function () { skewTo(0); speedTo(1); blurTo(0); },
+      onLeaveBack: function () { skewTo(0); speedTo(1); blurTo(0); }
     });
 
     gsap.from('.marquee', {
