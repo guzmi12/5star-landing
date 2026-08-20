@@ -1016,7 +1016,95 @@
   }
 
   /* =====================================================================
-     G. FONDO REACTIVO — el negro se tiñe de bordó donde pasa el cursor
+     G. CURSOR DE MARCADOR — una estrella de cinco puntas y su estela
+     ===================================================================== */
+  var STAR_PATH = 'M50 3 L60.87 35.03 L94.7 35.48 L67.59 55.72 L77.62 88.02 ' +
+                  'L50 68.5 L22.38 88.02 L32.41 55.72 L5.3 35.48 L39.13 35.03 Z';
+
+  function starMarkup() {
+    return '<svg viewBox="0 0 100 100" aria-hidden="true" focusable="false">' +
+           '<path d="' + STAR_PATH + '"/></svg>';
+  }
+
+  function buildCursor() {
+    if (!HOVERS || COARSE || REDUCED) return;
+
+    var wrap = document.createElement('div');
+    wrap.className = 'cursor';
+    wrap.setAttribute('aria-hidden', 'true');
+
+    // La estela va primero en el DOM para quedar por detrás de la punta.
+    var TRAIL = 5;
+    var dots = [];
+    for (var i = 0; i < TRAIL; i++) {
+      var d = document.createElement('span');
+      d.className = 'cursor__dot';
+      d.innerHTML = starMarkup();
+      wrap.appendChild(d);
+      dots.push(d);
+    }
+    var tip = document.createElement('span');
+    tip.className = 'cursor__tip';
+    tip.innerHTML = starMarkup();
+    wrap.appendChild(tip);
+
+    document.body.appendChild(wrap);
+    doc.classList.add('has-cursor');          // recién ahora escondemos el puntero
+
+    gsap.set([tip].concat(dots), { xPercent: -50, yPercent: -50 });
+    dots.forEach(function (d, i) {
+      gsap.set(d, { opacity: 0.5 - i * 0.07, scale: 1 - i * 0.1 });
+    });
+
+    var tipX = gsap.quickTo(tip, 'x', { duration: 0.25, ease: 'power3' });
+    var tipY = gsap.quickTo(tip, 'y', { duration: 0.25, ease: 'power3' });
+    var rotTo = gsap.quickTo(tip, 'rotation', { duration: 0.4, ease: 'power2' });
+    var scaleTo = gsap.quickTo(tip, 'scale', { duration: 0.35, ease: 'power3' });
+
+    // Cada mini-estrella llega más tarde que la anterior: la estela se abre
+    // sola cuando el mouse acelera y se cierra cuando frena.
+    var dotX = dots.map(function (d, i) {
+      return gsap.quickTo(d, 'x', { duration: 0.32 + i * 0.09, ease: 'power3' });
+    });
+    var dotY = dots.map(function (d, i) {
+      return gsap.quickTo(d, 'y', { duration: 0.32 + i * 0.09, ease: 'power3' });
+    });
+
+    var HOT = 'a,.orb,button,[role="button"]';
+    var wasHot = false;
+    var shown = false;
+    var px = null, pt = 0;
+
+    window.addEventListener('pointermove', function (e) {
+      var x = e.clientX, y = e.clientY;
+      tipX(x); tipY(y);
+      for (var i = 0; i < TRAIL; i++) { dotX[i](x); dotY[i](y); }
+
+      // Se inclina hacia donde va, hasta ±8°
+      var t = e.timeStamp;
+      if (px !== null && t > pt) {
+        rotTo(gsap.utils.clamp(-8, 8, (x - px) / (t - pt) * 1000 / 220));
+      }
+      px = x; pt = t;
+
+      var hot = !!(e.target && e.target.closest && e.target.closest(HOT));
+      if (hot !== wasHot) {
+        wasHot = hot;
+        tip.classList.toggle('is-hot', hot);
+        scaleTo(hot ? 1.2 : 1);
+      }
+
+      if (!shown) { shown = true; gsap.to(wrap, { opacity: 1, duration: 0.3 }); }
+    }, { passive: true });
+
+    document.addEventListener('pointerleave', function () {
+      gsap.to(wrap, { opacity: 0, duration: 0.25 });
+      shown = false;
+    });
+  }
+
+  /* =====================================================================
+     H. FONDO REACTIVO — el negro se tiñe de bordó donde pasa el cursor
      ===================================================================== */
   function buildSpotlight() {
     if (!HOVERS || COARSE || REDUCED) return;
@@ -1050,7 +1138,7 @@
   }
 
   /* =====================================================================
-     H. Cromo: nav y barra de progreso
+     I. Cromo: nav y barra de progreso
      ===================================================================== */
   function buildChrome() {
     var nav = q('#nav');
@@ -1083,6 +1171,7 @@
     buildConstel();
     buildContact();
     buildSpotlight();
+    buildCursor();
     buildChrome();
     ScrollTrigger.refresh();
     playIntro();

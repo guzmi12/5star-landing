@@ -549,7 +549,8 @@ html.js-constel .constel{height:240vh}
 .orb__bullet{width:.85em;height:.85em;flex:none;fill:var(--bordeaux)}
 
 @media (hover:hover) and (pointer:fine){
-  .orb.is-lit .orb__word{cursor:default}
+  /* con el cursor de marcador puesto no queremos que nada reponga un puntero */
+  html:not(.has-cursor) .orb.is-lit .orb__word{cursor:default}
 }
 
 /* Apilado: táctil, pantallas angostas o sin órbita */
@@ -691,6 +692,26 @@ html.js-constel .constel{height:240vh}
   font-size:var(--fs-meta);letter-spacing:.2em;text-transform:uppercase;
   color:var(--bone-55);
 }
+
+/* =========================================================
+   CURSOR DE MARCADOR — una estrella y su estela
+   Sólo lo crea el JS en punteros finos sin movimiento reducido.
+   ========================================================= */
+.cursor{position:fixed;inset:0;z-index:95;pointer-events:none;opacity:0}
+.cursor__tip,.cursor__dot{position:fixed;left:0;top:0;display:block}
+.cursor__tip{width:26px;height:26px}
+.cursor__dot{width:9px;height:9px}
+.cursor__tip svg,.cursor__dot svg{display:block;width:100%;height:100%;overflow:visible}
+.cursor__tip svg path{
+  fill:transparent;
+  stroke:var(--bone);stroke-width:7;stroke-linejoin:round;
+  transition:fill .3s var(--out),stroke .3s var(--out);
+}
+.cursor__tip.is-hot svg path{fill:var(--bordeaux);stroke:var(--bordeaux)}
+.cursor__dot svg path{fill:rgba(242,239,233,.5)}
+
+/* El puntero del sistema desaparece sólo cuando la estrella ya existe */
+html.has-cursor,html.has-cursor *{cursor:none}
 
 /* =========================================================
    SPOTLIGHT — el negro se tiñe de bordó donde está el cursor
