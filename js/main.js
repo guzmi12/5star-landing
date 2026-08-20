@@ -769,9 +769,97 @@
       var words = orbs.map(function (el) { return q('.orb__word', el); });
       var wasLit = orbs.map(function () { return false; });
 
+      /* ---------- pentagrama: se traza con el scroll ---------- */
+      // stroke-dashoffset a mano en vez de drawSVG por frame: es un solo
+      // número, lo escribe un quickSetter y no recalcula el path.
+      var penta = q('#constelPenta path');
+      var pentaLen = 0, setDash = null, setPentaO = null;
+      var pentaBase = 0;
+      var blink = { v: 1 };
+      var blinked = false;
+
+      if (penta && penta.getTotalLength) {
+        pentaLen = penta.getTotalLength();
+        penta.style.strokeDasharray = pentaLen;
+        penta.style.strokeDashoffset = pentaLen;
+        setDash = gsap.quickSetter(penta, 'strokeDashoffset');
+        setPentaO = gsap.quickSetter(q('#constelPenta'), 'opacity');
+      }
+
+      function paintPenta() {
+        if (setPentaO) setPentaO(pentaBase * blink.v);
+      }
+
+      /* ---------- campo de estrellitas ---------- */
+      var field = null;
+      var twinkles = [];
+
+      function buildField() {
+        if (REDUCED) return;                       // (en lite nunca se llega hasta acá)
+        field = document.createElement('div');
+        field.className = 'constel__field';
+        field.setAttribute('aria-hidden', 'true');
+
+        var frag = document.createDocumentFragment();
+        for (var i = 0; i < 40; i++) {
+          // Dejamos libre la banda central: ahí viven las palabras y el lockup.
+          var x, y, tries = 0;
+          do {
+            x = Math.random() * 100;
+            y = Math.random() * 100;
+            tries++;
+          } while (tries < 12 && Math.abs(x - 50) < 34 && Math.abs(y - 50) < 22);
+
+          var s = document.createElement('i');
+          var size = 2 + Math.random() * 4;
+          s.style.left = x.toFixed(2) + '%';
+          s.style.top = y.toFixed(2) + '%';
+          s.style.width = size.toFixed(1) + 'px';
+          s.style.height = size.toFixed(1) + 'px';
+          frag.appendChild(s);
+        }
+        field.appendChild(frag);
+        pin.insertBefore(field, pin.firstChild);
+
+        qa('i', field).forEach(function (s) {
+          var top = 0.12 + Math.random() * 0.40;
+          twinkles.push(gsap.fromTo(s,
+            { opacity: top * 0.12 },
+            {
+              opacity: top,
+              duration: 1.1 + Math.random() * 2.4,
+              delay: Math.random() * 2.5,
+              repeat: -1, yoyo: true, ease: 'sine.inOut'
+            }));
+        });
+      }
+      buildField();
+
       function render(p) {
         // Sobre el final la órbita se apaga: el lockup 5 + estrella se queda solo.
         var clear = 1 - gsap.utils.clamp(0, 1, (p - 0.82) / 0.14);
+
+        // El pentagrama se termina de trazar antes de que la órbita se apague
+        // y se desvanece con ella, así el lockup queda solo en cuadro.
+        if (setDash) {
+          var draw = gsap.utils.clamp(0, 1, (p - 0.06) / 0.70);
+          setDash(pentaLen * (1 - draw));
+          pentaBase = 0.5 * draw * clear;
+          paintPenta();
+
+          // Un solo parpadeo, justo cuando la órbita empieza a apagarse.
+          if (!blinked && p > 0.82) {
+            blinked = true;
+            gsap.timeline({ onUpdate: paintPenta })
+              .to(blink, { v: 0.06, duration: 0.07, ease: 'none' })
+              .to(blink, { v: 1, duration: 0.10, ease: 'none' })
+              .to(blink, { v: 0.18, duration: 0.06, ease: 'none' })
+              .to(blink, { v: 1, duration: 0.14, ease: 'none' });
+          } else if (blinked && p < 0.78) {
+            blinked = false;                 // se rearma si vuelve a subir
+          }
+        }
+
         for (var i = 0; i < orbs.length; i++) {
           var th = a0[i] + p * TURN;
           var z = Math.cos(th);            //  1 = frente, -1 = fondo
@@ -847,6 +935,19 @@
 
       return function () {
         doc.classList.remove('js-constel');
+
+        twinkles.forEach(function (t) { t.kill(); });
+        twinkles.length = 0;
+        if (field && field.parentNode) field.parentNode.removeChild(field);
+        field = null;
+
+        if (penta) {
+          gsap.killTweensOf(blink);
+          penta.style.strokeDasharray = '';
+          penta.style.strokeDashoffset = '';
+          gsap.set('#constelPenta', { clearProps: 'all' });
+        }
+
         orbs.forEach(function (el, i) {
           el.removeEventListener('mouseenter', onEnter[i]);
           if (words[i] && words[i].dataset.text) words[i].textContent = words[i].dataset.text;

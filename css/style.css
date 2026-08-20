@@ -443,6 +443,35 @@ html.js-constel .constel{height:240vh}
 }
 .constel__hint span{color:var(--bordeaux)}
 
+/* Pentagrama: la estrella de la marca, enorme y apenas insinuada, que el
+   scroll va trazando por detrás de todo. Sólo con la órbita activa. */
+.constel__pentagram{
+  position:absolute;left:50%;top:48%;
+  width:min(62vw,720px);height:auto;
+  transform:translate(-50%,-50%);
+  z-index:0;
+  overflow:visible;
+  fill:none;
+  stroke:var(--bordeaux);
+  stroke-width:1.6;
+  vector-effect:non-scaling-stroke;   /* trazo constante, no crece con el viewBox */
+  stroke-linejoin:round;
+  stroke-linecap:round;
+  opacity:0;
+  pointer-events:none;
+}
+.constel--stack .constel__pentagram{display:none}
+
+/* Campo de estrellitas: fondo de la sección, sólo opacidad (nunca layout) */
+.constel__field{position:absolute;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+.constel__field i{
+  position:absolute;
+  display:block;
+  background:var(--bone);
+  clip-path:polygon(50% 0%,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%);
+  opacity:0;
+}
+
 /* núcleo: la estrella late en el centro; el 5 llega al final, siempre aparte */
 .constel__core{
   position:absolute;left:50%;top:48%;
