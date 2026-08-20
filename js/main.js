@@ -263,14 +263,65 @@
           { scaleX: 0.32 },
           { scaleX: 1, duration: 1.35, repeat: -1, yoyo: true, ease: 'sine.inOut' });
       });
+    heroFill();
     return tl;
+  }
+
+  // El 5STAR arranca hueco —sólo el contorno de marcador— y los primeros
+  // 110 px de scroll lo repasan letra por letra, como si alguien lo pintara
+  // de izquierda a derecha. El contorno vira de hueso a bordó mientras se
+  // llena, así que el trazo sigue leyéndose sobre la letra ya rellena.
+  function heroFill() {
+    var word = q('.hero__word');
+    if (!word) return;
+
+    // splitReveal marca los caracteres con .ch; si SplitText no cargó,
+    // rellenamos la palabra entera de una.
+    var chars = qa('.ch', word);
+    var targets = chars.length ? chars : [word];
+
+    var RANGE = { trigger: '.hero', start: 'top top', end: '+=110', scrub: 0.4 };
+
+    gsap.fromTo(targets,
+      { color: 'rgba(242,239,233,0)' },
+      {
+        color: 'rgba(242,239,233,1)',
+        ease: 'none',
+        stagger: { each: 0.1, from: 'start' },
+        scrollTrigger: RANGE
+      });
+
+    // -webkit-text-stroke-color no es una propiedad que GSAP sepa
+    // interpolar como color, así que la escribimos a mano desde un proxy.
+    var edge = { p: 0 };
+    gsap.to(edge, {
+      p: 1, ease: 'none',
+      scrollTrigger: RANGE,
+      onUpdate: function () {
+        word.style.webkitTextStrokeColor =
+          gsap.utils.interpolate('#F2EFE9', '#910005', edge.p);
+      }
+    });
   }
 
   // El hero no se desvanece: atraviesa la cámara y deja pasar al video.
   function heroHandoff() {
+    // El bloque se queda atrás del scroll (yPercent positivo = se arrastra
+    // hacia abajo mientras la página sube) antes de atravesar la cámara.
     gsap.to('.hero__inner', {
-      scale: 1.3, yPercent: -6, filter: 'blur(16px)', opacity: 0, ease: 'none',
+      scale: 1.3, yPercent: 12, filter: 'blur(16px)', opacity: 0, ease: 'none',
       scrollTrigger: { trigger: '.hero', start: 'top top', end: 'bottom top', scrub: 0.55 }
+    });
+
+    // Parallax: cada línea se arrastra a su propio ritmo, así el hero tiene
+    // profundidad en vez de moverse como una calcomanía.
+    gsap.to('.hero__meta', {
+      yPercent: 90, ease: 'none',
+      scrollTrigger: { trigger: '.hero', start: 'top top', end: 'bottom top', scrub: 0.7 }
+    });
+    gsap.to('.hero__sub', {
+      yPercent: -55, ease: 'none',
+      scrollTrigger: { trigger: '.hero', start: 'top top', end: 'bottom top', scrub: 0.7 }
     });
     gsap.to('.hero__cue', {
       opacity: 0, y: 40, ease: 'none',

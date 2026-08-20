@@ -28,7 +28,13 @@
   --sub:'Archivo',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
   --sans:var(--sub);
 
-  --fs-hero:clamp(1.75rem,17vw,11.5rem);
+  /* «5STAR» mide 5.172 em en Druk Wide; con la estrella y el gap, 5.49 em.
+     A 15.8vw el lockup ocupa ~96% del ancho útil (100vw menos los dos
+     gutters) en todo el rango: llena la línea de borde a borde sin
+     recortarse. El 17vw anterior desbordaba por debajo de 1080px y el tope
+     de 11.5rem congelaba el título en 184px a partir de 1082px, que es por
+     lo que en escritorio se veía chico. */
+  --fs-hero:clamp(2rem,15.8vw,19.5rem);
   --fs-display:clamp(1.5rem,5.8vw,4.6rem);
   --fs-svc:clamp(1.05rem,2.5vw + .3rem,2.5rem);
   --fs-row:clamp(1rem,1.9vw + .32rem,2.3rem);
@@ -165,7 +171,10 @@ html:not(.js) .preloader{display:none}
   padding:calc(var(--sectionY) * .75) var(--gutter) clamp(1.5rem,4vw,3rem);
   overflow:hidden;
 }
-.hero__inner{align-self:center;width:100%}
+/* blur(0px) explícito, no `none`: deja el desenfoque cero como estado de
+   reposo (sin JS, en estático y con movimiento reducido el hero nunca
+   queda velado) y le da a GSAP un valor interpolable del que partir. */
+.hero__inner{align-self:center;width:100%;filter:blur(0px)}
 .hero__meta{
   font-size:var(--fs-meta);letter-spacing:.28em;text-transform:uppercase;
   color:var(--bone-70);
@@ -180,6 +189,13 @@ html:not(.js) .preloader{display:none}
   letter-spacing:-.005em;
   text-transform:uppercase;
   font-kerning:none;
+}
+/* El 5STAR nace hueco: sólo el contorno de marcador. El scroll lo rellena
+   (ver heroFill en main.js). Sólo en modo completo — sin JS o en estático
+   la palabra arranca y queda sólida. */
+html.js-motion .hero__word{
+  color:transparent;
+  -webkit-text-stroke:clamp(1.2px,.16vw,3px) var(--bone);
 }
 .hero__star{
   width:.2em;height:.2em;flex:none;
@@ -291,6 +307,7 @@ html.js-reel .reel__pin{
   margin-top:.18em;
   text-shadow:0 2px 30px rgba(0,0,0,.95),0 0 10px rgba(0,0,0,.85);
   will-change:transform,filter,opacity;
+  filter:blur(0px);   /* estado de reposo: el título entra desde blur(18px) y siempre vuelve a cero */
 }
 .svc__rule{
   display:block;height:2px;width:min(300px,42%);
@@ -709,6 +726,9 @@ html.js-motion .reel__end{visibility:hidden;opacity:0}
   }
   html.has-grain .grain{animation:none;opacity:.04}
   .preloader{display:none}
+  /* Nada queda velado ni hueco: blur cero y el 5STAR sólido. */
+  .hero__inner,.svc__title,.hero__word{filter:blur(0px)}
+  html.js-motion .hero__word{color:var(--bone);-webkit-text-stroke-width:0}
   .orb__rule{transform:scaleX(1)}
   .orb__note{opacity:1}
   html.js-motion [data-fade],
