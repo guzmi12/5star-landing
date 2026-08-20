@@ -236,7 +236,7 @@ html.js-motion .hero__word{
 .reel{position:relative}
 .reel__pin{display:none}
 
-html.js-reel .reel{height:460vh}
+html.js-reel .reel{height:720vh}
 html.js-reel .reel__pin{
   display:grid;
   grid-template-columns:100%;
@@ -810,7 +810,7 @@ html.js-motion .reel__end{visibility:hidden;opacity:0}
 
 /* Retrato angosto: el video se muestra entero (banda 16:9) y la copy vive debajo */
 @media (orientation:portrait) and (max-width:900px){
-  html.js-reel .reel{height:300vh}
+  html.js-reel .reel{height:470vh}
   html.js-reel .reel__pin{
     grid-template-rows:auto minmax(0,1fr);
     align-content:center;
