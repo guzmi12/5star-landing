@@ -16,7 +16,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="preload" as="image" href="assets/img/poster-hero.jpg">
-<link href="https://fonts.googleapis.com/css2?family=Anton&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Archivo:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body class="is-loading">
@@ -26,11 +26,11 @@
   <div class="preloader__inner">
     <svg class="preloader__star" viewBox="0 0 100 100" aria-hidden="true" focusable="false">
       <g fill="none" stroke="#910005" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
-        <path class="pl-leg" d="M50 6 Q 64 46 77 86"></path>
-        <path class="pl-leg" d="M77 86 Q 42 62 8 37"></path>
-        <path class="pl-leg" d="M8 37 Q 50 35 93 36"></path>
-        <path class="pl-leg" d="M93 36 Q 58 61 24 87"></path>
-        <path class="pl-leg" d="M24 87 Q 37 46 50 6"></path>
+        <path class="pl-leg" d="M39.13 35.03 L50 3 L60.87 35.03"></path>
+        <path class="pl-leg" d="M60.87 35.03 L94.7 35.48 L67.59 55.72"></path>
+        <path class="pl-leg" d="M67.59 55.72 L77.62 88.02 L50 68.5"></path>
+        <path class="pl-leg" d="M50 68.5 L22.38 88.02 L32.41 55.72"></path>
+        <path class="pl-leg" d="M32.41 55.72 L5.3 35.48 L39.13 35.03"></path>
       </g>
     </svg>
     <span class="preloader__count" id="plCount" aria-hidden="true">5</span>
@@ -79,7 +79,8 @@
 
       <div class="reel__media" id="reelMedia">
         <video id="reelVideo" class="reel__video"
-               data-src="assets/src/scroll-5stars-scrub.mp4"
+               data-src="assets/src/scroll-5stars-web.mp4"
+               data-src-light="assets/src/scroll-5stars-scrub.mp4"
                poster="assets/img/poster-hero.jpg"
                muted playsinline webkit-playsinline preload="auto"
                disablepictureinpicture
@@ -189,19 +190,59 @@
   </section>
   <p class="u-sr">We make things worth watching. 5STAR, Montevideo.</p>
 
-  <!-- ============ SERVICIOS · lista tipográfica ============ -->
-  <section class="index" id="servicios" aria-labelledby="indexTitle">
-    <header class="index__head">
-      <p class="eyebrow">qué hacemos</p>
-      <h2 class="index__title" id="indexTitle" data-split>LO QUE HACEMOS</h2>
-    </header>
-    <ol class="index__list">
-      <li class="row"><span class="row__star" aria-hidden="true"><svg viewBox="0 0 100 100"><path d="M50 3 L60.87 35.03 L94.7 35.48 L67.59 55.72 L77.62 88.02 L50 68.5 L22.38 88.02 L32.41 55.72 L5.3 35.48 L39.13 35.03 Z"/></svg></span><span class="row__n" aria-hidden="true">01</span><span class="row__t">Identidad visual</span><span class="row__u" aria-hidden="true"></span></li>
-      <li class="row"><span class="row__star" aria-hidden="true"><svg viewBox="0 0 100 100"><path d="M50 3 L60.87 35.03 L94.7 35.48 L67.59 55.72 L77.62 88.02 L50 68.5 L22.38 88.02 L32.41 55.72 L5.3 35.48 L39.13 35.03 Z"/></svg></span><span class="row__n" aria-hidden="true">02</span><span class="row__t">Producción audiovisual</span><span class="row__u" aria-hidden="true"></span></li>
-      <li class="row"><span class="row__star" aria-hidden="true"><svg viewBox="0 0 100 100"><path d="M50 3 L60.87 35.03 L94.7 35.48 L67.59 55.72 L77.62 88.02 L50 68.5 L22.38 88.02 L32.41 55.72 L5.3 35.48 L39.13 35.03 Z"/></svg></span><span class="row__n" aria-hidden="true">03</span><span class="row__t">Analítica de marketing, campañas y pautas</span><span class="row__u" aria-hidden="true"></span></li>
-      <li class="row"><span class="row__star" aria-hidden="true"><svg viewBox="0 0 100 100"><path d="M50 3 L60.87 35.03 L94.7 35.48 L67.59 55.72 L77.62 88.02 L50 68.5 L22.38 88.02 L32.41 55.72 L5.3 35.48 L39.13 35.03 Z"/></svg></span><span class="row__n" aria-hidden="true">04</span><span class="row__t">Publicidad con IA · UGC (TikTok, Reels)</span><span class="row__u" aria-hidden="true"></span></li>
-      <li class="row"><span class="row__star" aria-hidden="true"><svg viewBox="0 0 100 100"><path d="M50 3 L60.87 35.03 L94.7 35.48 L67.59 55.72 L77.62 88.02 L50 68.5 L22.38 88.02 L32.41 55.72 L5.3 35.48 L39.13 35.03 Z"/></svg></span><span class="row__n" aria-hidden="true">05</span><span class="row__t">Desarrollo de diseño web</span><span class="row__u" aria-hidden="true"></span></li>
-    </ol>
+  <!-- ============ CONSTELACIÓN 5STAR · las cinco disciplinas en órbita ============ -->
+  <section class="constel" id="servicios" aria-labelledby="constelTitle">
+    <div class="constel__pin">
+      <header class="constel__head">
+        <p class="eyebrow" data-fade>lo que hacemos</p>
+        <h2 class="constel__title" id="constelTitle" data-split>CONSTELACIÓN</h2>
+      </header>
+
+      <div class="constel__core" aria-hidden="true">
+        <svg class="core__star" viewBox="0 0 100 100" focusable="false"><path d="M50 3 L60.87 35.03 L94.7 35.48 L67.59 55.72 L77.62 88.02 L50 68.5 L22.38 88.02 L32.41 55.72 L5.3 35.48 L39.13 35.03 Z"/></svg>
+        <span class="core__five">5</span>
+      </div>
+
+      <ul class="constel__orbit">
+        <li class="orb" data-orb="0">
+          <span class="orb__flare" aria-hidden="true"></span>
+          <span class="orb__word" data-scramble>IDENTIDAD VISUAL</span>
+          <span class="orb__rule" aria-hidden="true"></span>
+          <span class="orb__note"><svg class="orb__bullet" viewBox="0 0 100 100" aria-hidden="true"><path d="M50 3 L60.87 35.03 L94.7 35.48 L67.59 55.72 L77.62 88.02 L50 68.5 L22.38 88.02 L32.41 55.72 L5.3 35.48 L39.13 35.03 Z"/></svg>marcas que se miran dos veces</span>
+          <span class="u-sr">Identidad visual</span>
+        </li>
+        <li class="orb" data-orb="1">
+          <span class="orb__flare" aria-hidden="true"></span>
+          <span class="orb__word" data-scramble>PRODUCCIÓN AUDIOVISUAL</span>
+          <span class="orb__rule" aria-hidden="true"></span>
+          <span class="orb__note"><svg class="orb__bullet" viewBox="0 0 100 100" aria-hidden="true"><path d="M50 3 L60.87 35.03 L94.7 35.48 L67.59 55.72 L77.62 88.02 L50 68.5 L22.38 88.02 L32.41 55.72 L5.3 35.48 L39.13 35.03 Z"/></svg>cámara, encuadre y corte final</span>
+          <span class="u-sr">Producción audiovisual</span>
+        </li>
+        <li class="orb" data-orb="2">
+          <span class="orb__flare" aria-hidden="true"></span>
+          <span class="orb__word" data-scramble>ANALÍTICA · CAMPAÑAS</span>
+          <span class="orb__rule" aria-hidden="true"></span>
+          <span class="orb__note"><svg class="orb__bullet" viewBox="0 0 100 100" aria-hidden="true"><path d="M50 3 L60.87 35.03 L94.7 35.48 L67.59 55.72 L77.62 88.02 L50 68.5 L22.38 88.02 L32.41 55.72 L5.3 35.48 L39.13 35.03 Z"/></svg>los números también cuentan la historia</span>
+          <span class="u-sr">Analítica de marketing, campañas y pautas</span>
+        </li>
+        <li class="orb" data-orb="3">
+          <span class="orb__flare" aria-hidden="true"></span>
+          <span class="orb__word" data-scramble>IA · UGC</span>
+          <span class="orb__rule" aria-hidden="true"></span>
+          <span class="orb__note"><svg class="orb__bullet" viewBox="0 0 100 100" aria-hidden="true"><path d="M50 3 L60.87 35.03 L94.7 35.48 L67.59 55.72 L77.62 88.02 L50 68.5 L22.38 88.02 L32.41 55.72 L5.3 35.48 L39.13 35.03 Z"/></svg>volumen creativo sin set de filmación</span>
+          <span class="u-sr">Publicidad con IA · UGC (TikTok, Reels)</span>
+        </li>
+        <li class="orb" data-orb="4">
+          <span class="orb__flare" aria-hidden="true"></span>
+          <span class="orb__word" data-scramble>DISEÑO WEB</span>
+          <span class="orb__rule" aria-hidden="true"></span>
+          <span class="orb__note"><svg class="orb__bullet" viewBox="0 0 100 100" aria-hidden="true"><path d="M50 3 L60.87 35.03 L94.7 35.48 L67.59 55.72 L77.62 88.02 L50 68.5 L22.38 88.02 L32.41 55.72 L5.3 35.48 L39.13 35.03 Z"/></svg>sitios que se mueven como una película</span>
+          <span class="u-sr">Desarrollo de diseño web</span>
+        </li>
+      </ul>
+
+      <p class="constel__hint" aria-hidden="true">cinco disciplinas <span>·</span> una órbita</p>
+    </div>
   </section>
 
   <!-- ============ CONTACTO ============ -->
@@ -211,8 +252,8 @@
     </div>
 
     <svg class="contact__draw" viewBox="0 0 100 100" aria-hidden="true" focusable="false">
-      <path id="drawStar" d="M50 6 Q 64 46 77 86 Q 42 62 8 37 Q 50 35 93 36 Q 58 61 24 87 Q 37 46 50 6"
-            fill="none" stroke="#910005" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path>
+      <path id="drawStar" d="M50 3 L60.87 35.03 L94.7 35.48 L67.59 55.72 L77.62 88.02 L50 68.5 L22.38 88.02 L32.41 55.72 L5.3 35.48 L39.13 35.03 Z"
+            fill="none" stroke="#910005" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
     </svg>
 
     <div class="contact__inner">

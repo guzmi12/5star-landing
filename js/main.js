@@ -41,12 +41,16 @@
         (picos de luminancia reales: 2.85s, 6.30s, 8.80s, 13.25s, 15.90s)
      --------------------------------------------------------------------- */
   var VIDEO_DUR = 20;
+
+  // Medido sobre el video nuevo con ffprobe+signalstats a 8fps.
+  // Cuatro estrellas protagonistas + la UNIFICACIÓN (todas juntas -> estallido).
+  // El servicio 05 cae en la unificación, nunca antes.
   var WINDOWS = [
-    { in: 1.90, peak: 2.85,  out: 4.50 },
-    { in: 5.50, peak: 6.30,  out: 7.70 },
-    { in: 8.10, peak: 8.80,  out: 10.60 },
-    { in: 12.30, peak: 13.25, out: 14.20 },
-    { in: 14.90, peak: 15.90, out: 16.80 }
+    { in: 2.00,  peak: 2.94,  out: 4.10 },   // 01 · una estrella llena el cuadro
+    { in: 5.50,  peak: 6.38,  out: 7.40 },   // 02 · fogonazo blanco al cruzar
+    { in: 8.05,  peak: 8.75,  out: 10.40 },  // 03 · la estrella más grande, centrada
+    { in: 12.45, peak: 13.38, out: 14.35 },  // 04 · la estrella con su séquito
+    { in: 15.30, peak: 16.60, out: 16.95 }   // 05 · UNIFICACIÓN -> estallido -> lockup
   ];
 
   /* =====================================================================
@@ -62,7 +66,9 @@
     var video = q('#reelVideo');
     if (video) video.parentNode.removeChild(video);
 
-    var targets = qa('.lite__item, .lite__end, .row');
+    var constel = q('.constel');
+    if (constel) constel.classList.add('constel--stack');
+    var targets = qa('.lite__item, .lite__end, .orb');
 
     if ('IntersectionObserver' in window) {
       var io = new IntersectionObserver(function (entries) {
@@ -138,7 +144,7 @@
     if (!HAS_SPLIT) {
       return gsap.from(el, Object.assign({ yPercent: 40, opacity: 0, duration: 0.9 }, vars || {}));
     }
-    var split = SplitText.create(el, { type: 'chars,words', mask: 'chars', aria: 'auto' });
+    var split = SplitText.create(el, { type: 'chars,words', mask: 'chars', charsClass: 'ch', aria: 'auto' });
     return gsap.from(split.chars, Object.assign({
       yPercent: 118,
       skewY: 7,
@@ -264,7 +270,11 @@
     if (!video || !cards.length) return;
 
     // Cargamos el video sólo en modo completo
-    if (video.dataset.src && !video.src) video.src = video.dataset.src;
+    if (!video.src) {
+      var useLight = COARSE || SAVE_DATA || window.innerWidth < 900;
+      var picked = (useLight && video.dataset.srcLight) ? video.dataset.srcLight : video.dataset.src;
+      if (picked) video.src = picked;
+    }
     video.muted = true;
 
     var state = { t: 0 };
@@ -369,7 +379,7 @@
 
     // Cierre: el lockup del video (5 + estrella) queda solo en pantalla
     tl.fromTo(end, { autoAlpha: 0, yPercent: 45 },
-      { autoAlpha: 1, yPercent: 0, duration: 0.9, ease: 'power3.out' }, 17.70);
+      { autoAlpha: 1, yPercent: 0, duration: 0.9, ease: 'power3.out' }, 18.10);
 
     // El indicador de progreso sólo existe mientras dura el reel
     var hud = q('#hud');
@@ -454,28 +464,187 @@
   }
 
   /* =====================================================================
-     E. ÍNDICE — filas tipográficas con barrido lateral
+     E. CONSTELACIÓN — cinco disciplinas orbitando la estrella.
+        La palabra que pasa por el frente se enciende; el resto se hunde
+        en el fondo, chica y desenfocada. Es el propio movimiento el que
+        jerarquiza: no hay lista que dictar.
      ===================================================================== */
-  function buildIndex() {
-    fadeIn('.index .eyebrow', {
+  var GLYPHS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789·';
+
+  function scramble(el) {
+    if (REDUCED || !el) return;
+    var finalText = el.dataset.text || el.textContent;
+    el.dataset.text = finalText;
+    if (el._scr) el._scr.kill();
+    var st = { p: 0 };
+    el._scr = gsap.to(st, {
+      p: 1, duration: 0.5, ease: 'power2.out',
+      onUpdate: function () {
+        var n = finalText.length, shown = Math.floor(st.p * n), out = '', i, c;
+        for (i = 0; i < n; i++) {
+          c = finalText.charAt(i);
+          out += (i < shown || c === ' ') ? c : GLYPHS.charAt((Math.random() * GLYPHS.length) | 0);
+        }
+        el.textContent = out;
+      },
+      onComplete: function () { el.textContent = finalText; }
+    });
+  }
+
+  function buildConstel() {
+    var sec = q('.constel');
+    var pin = q('.constel__pin');
+    var orbs = qa('.orb');
+    var core = q('.constel__core');
+    var five = q('.core__five');
+    var star = q('.core__star');
+    if (!sec || !pin || !orbs.length) return;
+
+    fadeIn('.constel .eyebrow', {
       duration: 0.7,
-      scrollTrigger: { trigger: '.index', start: 'top 78%', once: true }
+      scrollTrigger: { trigger: sec, start: 'top 80%', once: true }
+    });
+    splitReveal('.constel__title', {
+      scrollTrigger: { trigger: '.constel__title', start: 'top 92%', once: true }
     });
 
-    splitReveal('.index__title', {
-      scrollTrigger: { trigger: '.index__title', start: 'top 85%', once: true }
-    });
+    var mm = gsap.matchMedia();
 
-    qa('.row').forEach(function (row) {
-      gsap.fromTo(row,
-        { clipPath: 'inset(0% 100% 0% 0%)', opacity: 0 },
-        {
-          clipPath: 'inset(0% 0% 0% 0%)', opacity: 1, duration: 0.85, ease: 'power3.out',
-          scrollTrigger: {
-            trigger: row, start: 'top 90%', once: true,
-            onEnter: function () { if (!HOVERS) row.classList.add('is-in'); }
-          }
+    mm.add({
+      orbit: '(hover: hover) and (pointer: fine) and (min-width: 901px)',
+      stack: '(hover: none), (pointer: coarse), (max-width: 900px)'
+    }, function (ctx) {
+
+      /* ---------- apilado: sin órbita, revelado escalonado ---------- */
+      if (ctx.conditions.stack) {
+        sec.classList.add('constel--stack');
+        orbs.forEach(function (el, i) {
+          gsap.from(el, {
+            y: 34, opacity: 0, duration: 0.75, ease: 'power3.out',
+            scrollTrigger: { trigger: el, start: 'top 92%', once: true }
+          });
         });
+        return function () { sec.classList.remove('constel--stack'); };
+      }
+
+      /* ---------- órbita ---------- */
+      sec.classList.remove('constel--stack');
+      doc.classList.add('js-constel');
+
+      var TURN = 6.98;                                  // ~1,11 vueltas en toda la sección
+      var AT = [0.10, 0.28, 0.46, 0.64, 0.82];          // cuándo pasa cada palabra por el frente
+      var a0 = AT.map(function (p) { return -p * TURN; });
+
+      var RX = 0, RY = 0;
+      function measure() {
+        RX = Math.min(pin.offsetWidth * 0.22, 300);
+        RY = Math.min(pin.offsetHeight * 0.20, 165);
+      }
+      measure();
+
+      gsap.set(orbs, { xPercent: -50, yPercent: -50 });
+      gsap.set(core, { xPercent: -50, yPercent: -50 });
+
+      var sx = orbs.map(function (el) { return gsap.quickSetter(el, 'x', 'px'); });
+      var sy = orbs.map(function (el) { return gsap.quickSetter(el, 'y', 'px'); });
+      var ss = orbs.map(function (el) { return gsap.quickSetter(el, 'scale'); });
+      var so = orbs.map(function (el) { return gsap.quickSetter(el, 'opacity'); });
+      var sf = orbs.map(function (el) { return gsap.quickSetter(el, 'filter'); });
+      var flare = orbs.map(function (el) { return gsap.quickSetter(q('.orb__flare', el), 'opacity'); });
+      var rule = orbs.map(function (el) { return gsap.quickSetter(q('.orb__rule', el), 'scaleX'); });
+      var note = orbs.map(function (el) { return gsap.quickSetter(q('.orb__note', el), 'opacity'); });
+      var words = orbs.map(function (el) { return q('.orb__word', el); });
+      var wasLit = orbs.map(function () { return false; });
+
+      function render(p) {
+        // Sobre el final la órbita se apaga: el lockup 5 + estrella se queda solo.
+        var clear = 1 - gsap.utils.clamp(0, 1, (p - 0.82) / 0.14);
+        for (var i = 0; i < orbs.length; i++) {
+          var th = a0[i] + p * TURN;
+          var z = Math.cos(th);            //  1 = frente, -1 = fondo
+          var d = (z + 1) / 2;             //  0..1 profundidad
+
+          sx[i](RX * Math.sin(th));
+          sy[i](RY * z);
+          ss[i](0.46 + 0.54 * d);
+          so[i]((0.10 + 0.90 * Math.pow(d, 2.1)) * clear);
+          sf[i]('blur(' + ((1 - d) * 7).toFixed(2) + 'px)');
+          orbs[i].style.zIndex = String(Math.round(50 + z * 40));
+
+          var lit = gsap.utils.clamp(0, 1, (z - 0.55) / 0.42) * clear;
+          flare[i](lit * 0.72);
+          rule[i](lit);
+          note[i](lit);
+
+          var isLit = lit > 0.62;
+          if (isLit !== wasLit[i]) {
+            wasLit[i] = isLit;
+            orbs[i].classList.toggle('is-lit', isLit);
+            if (isLit) scramble(words[i]);           // se enciende decodificándose
+          }
+        }
+      }
+
+      var stOrbit = ScrollTrigger.create({
+        id: 'constel',
+        trigger: sec,
+        start: 'top top',
+        end: 'bottom bottom',
+        pin: pin,
+        pinSpacing: false,
+        scrub: 0.7,
+        invalidateOnRefresh: true,
+        onRefresh: function (self) { measure(); render(self.progress); },
+        onUpdate: function (self) { render(self.progress); }
+      });
+
+      // El núcleo late y gira. El 5 llega sobre el final SIEMPRE como elemento
+      // aparte de la estrella: nunca se funden en un solo glifo.
+      // Un único timeline sobre el rango del pin -> las posiciones son
+      // fracciones del scroll fijado (con pinSpacing:false, '76% top' caería
+      // fuera del rango y el tween no llegaría a correr).
+      var tlCore = gsap.timeline({
+        defaults: { ease: 'none' },
+        scrollTrigger: {
+          trigger: sec, start: 'top top', end: 'bottom bottom',
+          scrub: 0.8, invalidateOnRefresh: true
+        }
+      });
+      tlCore.to(star, { rotation: 216, duration: 1 }, 0)
+        .fromTo(five,
+          { opacity: 0, x: -60, filter: 'blur(12px)' },
+          { opacity: 1, x: 0, filter: 'blur(0px)', duration: 0.22, ease: 'power2.out' }, 0.74)
+        .fromTo(core,
+          { x: 0 },
+          { x: function () { return five.offsetWidth * 0.5; }, duration: 0.22 }, 0.74);
+
+      gsap.to(star, {
+        scale: 1.12, duration: 1.9, repeat: -1, yoyo: true, ease: 'sine.inOut',
+        transformOrigin: '50% 50%'
+      });
+
+      // hover: decodificación manual (sin plugin de pago)
+      var onEnter = orbs.map(function (el, i) {
+        var fn = function () { if (orbs[i].classList.contains('is-lit')) scramble(words[i]); };
+        el.addEventListener('mouseenter', fn);
+        return fn;
+      });
+
+      render(stOrbit.progress);
+
+      return function () {
+        doc.classList.remove('js-constel');
+        orbs.forEach(function (el, i) {
+          el.removeEventListener('mouseenter', onEnter[i]);
+          if (words[i] && words[i].dataset.text) words[i].textContent = words[i].dataset.text;
+          el.style.zIndex = '';
+          gsap.set(el, { clearProps: 'all' });
+          gsap.set(q('.orb__flare', el), { clearProps: 'all' });
+          gsap.set(q('.orb__rule', el), { clearProps: 'all' });
+          gsap.set(q('.orb__note', el), { clearProps: 'all' });
+        });
+        gsap.set([core, five, star], { clearProps: 'all' });
+      };
     });
   }
 
@@ -548,7 +717,7 @@
     heroHandoff();
     buildReel();
     buildMarquee();
-    buildIndex();
+    buildConstel();
     buildContact();
     buildChrome();
     ScrollTrigger.refresh();
