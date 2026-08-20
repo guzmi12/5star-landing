@@ -1016,7 +1016,41 @@
   }
 
   /* =====================================================================
-     G. Cromo: nav y barra de progreso
+     G. FONDO REACTIVO — el negro se tiñe de bordó donde pasa el cursor
+     ===================================================================== */
+  function buildSpotlight() {
+    if (!HOVERS || COARSE || REDUCED) return;
+
+    var spot = document.createElement('div');
+    spot.className = 'spot';
+    spot.setAttribute('aria-hidden', 'true');
+    document.body.appendChild(spot);
+
+    gsap.set(spot, {
+      xPercent: -50, yPercent: -50,
+      x: window.innerWidth / 2, y: window.innerHeight / 2
+    });
+
+    var xTo = gsap.quickTo(spot, 'x', { duration: 0.55, ease: 'power3' });
+    var yTo = gsap.quickTo(spot, 'y', { duration: 0.55, ease: 'power3' });
+    var aTo = gsap.quickTo(spot, 'opacity', { duration: 0.6, ease: 'power2' });
+
+    // Sobre hero, constelación y contacto el bordó sube a tope; en el resto
+    // se queda a media luz. Preguntamos por el target del propio evento en
+    // vez de hacer elementFromPoint: no fuerza layout.
+    window.addEventListener('pointermove', function (e) {
+      xTo(e.clientX);
+      yTo(e.clientY);
+      var hot = e.target && e.target.closest &&
+                e.target.closest('.hero,.constel,.contact');
+      aTo(hot ? 1 : 0.6);
+    }, { passive: true });
+
+    document.addEventListener('pointerleave', function () { aTo(0); });
+  }
+
+  /* =====================================================================
+     H. Cromo: nav y barra de progreso
      ===================================================================== */
   function buildChrome() {
     var nav = q('#nav');
@@ -1048,6 +1082,7 @@
     buildMarquee();
     buildConstel();
     buildContact();
+    buildSpotlight();
     buildChrome();
     ScrollTrigger.refresh();
     playIntro();
