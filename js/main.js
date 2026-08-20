@@ -991,10 +991,24 @@
       scrollTrigger: { trigger: '.contact__title', start: 'top 85%', once: true }
     });
 
-    gsap.from('.btn', {
+    gsap.from('.mail', {
       y: 34, opacity: 0, duration: 0.8,
-      scrollTrigger: { trigger: '.btn', start: 'top 92%', once: true }
+      scrollTrigger: { trigger: '.mail', start: 'top 92%', once: true }
     });
+
+    // La estrella gigante del fondo se traza al entrar la sección, detrás
+    // del copy y siempre por debajo del bordó pleno para no competir.
+    var star = q('#contactStar');
+    var starPath = q('#contactStar path');
+    if (star && starPath) {
+      var enter = { trigger: '.contact', start: 'top 78%', once: true };
+      gsap.to(star, { opacity: 0.5, duration: 1.2, scrollTrigger: enter });
+      if (HAS_DRAW) {
+        gsap.fromTo(starPath,
+          { drawSVG: '0% 0%' },
+          { drawSVG: '0% 100%', duration: 2.4, ease: 'power2.inOut', scrollTrigger: enter });
+      }
+    }
     gsap.from('.contact__alt', {
       y: 22, opacity: 0, duration: 0.7,
       scrollTrigger: { trigger: '.contact__alt', start: 'top 95%', once: true }

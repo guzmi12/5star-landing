@@ -591,7 +591,7 @@ html.js-constel .constel{height:240vh}
   overflow:hidden;
   isolation:isolate;
 }
-.contact__inner{position:relative;max-width:1500px;margin-inline:auto}
+.contact__inner{position:relative;z-index:1;max-width:1500px;margin-inline:auto}
 .contact__title{
   font-family:var(--display);font-weight:400;
   font-size:var(--fs-display);
@@ -600,29 +600,75 @@ html.js-constel .constel{height:240vh}
   max-width:11ch;
   text-shadow:0 4px 40px rgba(0,0,0,.7);
 }
-.btn{
-  position:relative;display:inline-flex;align-items:center;
-  min-height:56px;
-  padding:1rem clamp(1.2rem,3vw,2.4rem);
-  border:1px solid var(--bordeaux);
-  overflow:hidden;
-  background:rgba(0,0,0,.35);
+/* Estrella gigante de contorno, detrás del copy. La dibuja el scroll. */
+.contact__star{
+  position:absolute;
+  right:-8vw;top:52%;
+  width:min(52vw,620px);height:auto;
+  transform:translateY(-50%);
+  z-index:0;
+  overflow:visible;
+  fill:none;
+  stroke:var(--bordeaux);
+  stroke-width:1.4;
+  vector-effect:non-scaling-stroke;
+  stroke-linejoin:round;
+  opacity:0;
+  pointer-events:none;
+}
+
+/* El mail deja de ser un botón: es el título más grande de la sección.
+   Druk Wide tiene minúsculas y son 19% más angostas que las versales, así
+   que va tal cual está escrito —que además es el copy aprobado— y entra
+   más grande. 17.75 em de ancho: a 4.5rem son 1278px, dentro de los
+   1500px de .contact__inner. */
+.mail{
+  display:inline-block;
+  max-width:100%;
+  margin-top:.1em;
+}
+.mail__text{
+  display:block;
   font-family:var(--display);
-  font-size:clamp(.72rem,1.45vw,1.15rem);
-  letter-spacing:.02em;
+  font-size:clamp(1.15rem,4.9vw,4.5rem);
+  line-height:.95;
+  letter-spacing:-.01em;
+  overflow-wrap:anywhere;        /* red de seguridad: nunca desborda, parte la línea */
+
+  /* Dos capas recortadas contra el texto: el hueso siempre debajo y el
+     bordó creciendo por encima de izquierda a derecha. Así el relleno
+     barre sin que el glifo se lave a medio camino. */
+  color:transparent;
+  background-image:
+    linear-gradient(var(--bordeaux),var(--bordeaux)),
+    linear-gradient(var(--bone),var(--bone));
+  background-repeat:no-repeat,no-repeat;
+  background-position:left center,left center;
+  background-size:0% 100%,100% 100%;
+  -webkit-background-clip:text;
+  background-clip:text;
+  transition:background-size .55s var(--out);
+}
+.mail:hover .mail__text,
+.mail:focus-visible .mail__text{background-size:100% 100%,100% 100%}
+
+/* Sin recorte contra el texto el glifo transparente sería invisible */
+@supports not ((-webkit-background-clip:text) or (background-clip:text)){
+  .mail__text{color:var(--bone);background-image:none}
+  .mail:hover .mail__text{color:var(--bordeaux)}
+}
+
+.mail__cue{
+  display:block;
+  margin-top:clamp(.6rem,1.4vw,1rem);
+  font-family:var(--sub);
+  font-size:var(--fs-meta);
+  letter-spacing:.24em;
   text-transform:uppercase;
-  transition:border-color .4s var(--out);
+  color:var(--bone-55);
+  transition:color .4s var(--out);
 }
-.btn__fill{
-  position:absolute;inset:0;background:var(--bordeaux);
-  transform:scaleY(0);transform-origin:bottom;
-  transition:transform .55s var(--out);
-}
-.btn__label{position:relative;display:block;overflow:hidden;height:1.15em}
-.btn__label i{display:block;font-style:normal;line-height:1.15;transition:transform .55s var(--out)}
-.btn:hover,.btn:focus-visible{border-color:var(--bone)}
-.btn:hover .btn__fill,.btn:focus-visible .btn__fill{transform:scaleY(1)}
-.btn:hover .btn__label i,.btn:focus-visible .btn__label i{transform:translateY(-100%)}
+.mail:hover .mail__cue,.mail:focus-visible .mail__cue{color:var(--bordeaux)}
 .contact__alt{margin-top:clamp(1.3rem,3vw,2.2rem);color:var(--bone-70)}
 .contact__alt a{
   display:inline-block;min-height:44px;line-height:2.4;
