@@ -165,7 +165,7 @@
      --------------------------------------------------------------------- */
   function buildGrain() {
     if (COARSE || REDUCED || window.innerWidth < 1024) return;
-    var size = 170;
+    var size = 200;   // se muestra escalado por CSS -> textura fina, no manchas
     var c = document.createElement('canvas');
     c.width = c.height = size;
     var ctx = c.getContext('2d');
@@ -649,23 +649,9 @@
   }
 
   /* =====================================================================
-     F. CONTACTO — la estrella se dibuja a mano mientras bajás
+     F. CONTACTO — fondo limpio: sólo el cierre y el mail
      ===================================================================== */
   function buildContact() {
-    gsap.to('.contact__bg img', {
-      yPercent: 14, ease: 'none',
-      scrollTrigger: { trigger: '.contact', start: 'top bottom', end: 'bottom top', scrub: true }
-    });
-
-    if (HAS_DRAW) {
-      gsap.fromTo('#drawStar',
-        { drawSVG: '0% 0%' },
-        {
-          drawSVG: '0% 100%', ease: 'none',
-          scrollTrigger: { trigger: '.contact', start: 'top 88%', end: 'bottom 92%', scrub: 0.6 }
-        });
-    }
-
     fadeIn('.contact .eyebrow', {
       duration: 0.7,
       scrollTrigger: { trigger: '.contact', start: 'top 72%', once: true }
