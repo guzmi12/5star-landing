@@ -302,15 +302,49 @@
 
     var state = { t: 0 };
 
-    // Consultamos readyState en cada seek en vez de fiarnos de un evento único:
-    // si el video todavía se estaba descargando, igual arranca solo al estar listo.
-    function seek() {
-      if (video.readyState < 1) return;   // HAVE_METADATA
-      var t = state.t;
-      if (t < 0) t = 0;
-      if (t > VIDEO_DUR) t = VIDEO_DUR;
-      try { video.currentTime = t; } catch (err) { /* el navegador aún no puede buscar */ }
+    // Tolerancia de sincronía: a 24 fps un fotograma dura 0.0417 s, así que
+    // 0.05 es "estamos en el frame correcto". Por debajo de eso no pedimos
+    // nada y le ahorramos el trabajo al decodificador.
+    var SEEK_EPS = 0.05;
+    var pendingSeek = null;
+
+    function clampT(t) {
+      if (!(t > 0)) return 0;                       // cubre NaN y negativos
+      return t > VIDEO_DUR ? VIDEO_DUR : t;
     }
+
+    // Único camino para mover el video, compartido por el scrub y por el
+    // reconciliador. Consultamos readyState en cada seek en vez de fiarnos de
+    // un evento único: si el video todavía se estaba descargando, igual
+    // arranca solo al estar listo.
+    function applySeek(t) {
+      if (video.readyState < 1) return;             // HAVE_METADATA
+      t = clampT(t);
+      if (Math.abs(video.currentTime - t) <= SEEK_EPS) return;
+
+      // Pedir un seek nuevo mientras hay otro en curso cancela el anterior y
+      // deja el video donde estaba: guardamos el destino y lo reemitimos
+      // cuando el navegador avisa que terminó.
+      if (video.seeking) { pendingSeek = t; return; }
+      pendingSeek = null;
+
+      try {
+        // El video es all-intra: todo fotograma es keyframe, así que fastSeek
+        // cae exactamente en el frame pedido y cuesta bastante menos que
+        // currentTime (Safari y Firefox). En Chrome no existe todavía.
+        if (typeof video.fastSeek === 'function') video.fastSeek(t);
+        else video.currentTime = t;
+      } catch (err) { /* el navegador aún no puede buscar */ }
+    }
+
+    video.addEventListener('seeked', function () {
+      if (pendingSeek === null) return;
+      var t = pendingSeek;
+      pendingSeek = null;
+      applySeek(t);
+    });
+
+    function seek() { applySeek(state.t); }
 
     function onMeta() {
       if (video.duration && isFinite(video.duration)) VIDEO_DUR = video.duration;
@@ -425,13 +459,8 @@
     // silencio y no vuelve a intentarlo. Mientras el reel está en pantalla
     // comparamos posición real contra objetivo y reemitimos si se desfasaron.
     gsap.ticker.add(function () {
-      if (!reelLive || video.readyState < 1 || video.seeking) return;
-      var t = state.t;
-      if (t < 0) t = 0;
-      if (t > VIDEO_DUR) t = VIDEO_DUR;
-      if (Math.abs(video.currentTime - t) > 0.2) {
-        try { video.currentTime = t; } catch (err) { /* seek no disponible aún */ }
-      }
+      if (!reelLive || video.readyState < 1) return;
+      applySeek(state.t);
     });
 
     // Sonda de verificación
