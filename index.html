@@ -16,7 +16,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="preload" as="image" href="assets/img/poster-hero.jpg">
-<link href="https://fonts.googleapis.com/css2?family=Anton&family=Archivo:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body class="is-loading">
@@ -72,6 +72,16 @@
       <span class="cue__line" aria-hidden="true"></span>
       <span class="cue__text">scrolleá — el video es el scroll</span>
     </a>
+
+    <!-- ANTESALA · el hero no termina: se abre. Cuatro guías finas bajan hacia
+         el reel y una línea bordó desciende marcando por dónde va a entrar el
+         video. Puramente decorativo, lo anima buildGate() en main.js. -->
+    <div class="gate gate--hero" id="heroGate" aria-hidden="true">
+      <span class="gate__rules">
+        <i></i><i></i><i></i><i></i>
+      </span>
+      <span class="gate__drop"></span>
+    </div>
   </section>
 
   <!-- ============ THE REEL · pinned video scrub ============ -->
@@ -83,46 +93,77 @@
                data-src="assets/src/scroll-5stars-web.mp4"
                data-src-light="assets/src/scroll-5stars-scrub.mp4"
                poster="assets/img/poster-hero.jpg"
-               muted playsinline webkit-playsinline preload="auto"
+               muted playsinline webkit-playsinline preload="none"
                disablepictureinpicture
                aria-label="Cinco estrellas rojas atravesando el humo hasta formar el logotipo de 5STAR"></video>
+        <!-- Estado inicial estable: el poster pintado como capa propia. Se
+             desvanece recién cuando el video tiene fotograma, así en iOS
+             nunca se ve un rectángulo negro esperando la descarga. -->
+        <span class="reel__poster" id="reelPoster" aria-hidden="true"></span>
         <span class="reel__scrim" aria-hidden="true"></span>
         <span class="reel__flare" id="reelFlare" aria-hidden="true"></span>
+      </div>
+
+      <!-- ANTESALA · recibe lo que el hero soltó: retícula que respira, dos
+           barras que abren el cuadro como un obturador y el trazo de la
+           estrella dibujándose mientras el video sale del humo. Se disuelve
+           por completo antes de que entre el primer servicio. -->
+      <div class="gate gate--reel" id="reelGate" aria-hidden="true">
+        <span class="gate__grid"></span>
+        <span class="gate__bar gate__bar--t"></span>
+        <span class="gate__bar gate__bar--b"></span>
+        <svg class="gate__arc" viewBox="0 0 100 100" focusable="false">
+          <path d="M50 3 L60.87 35.03 L94.7 35.48 L67.59 55.72 L77.62 88.02 L50 68.5 L22.38 88.02 L32.41 55.72 L5.3 35.48 L39.13 35.03 Z"/>
+        </svg>
       </div>
 
       <div class="reel__copy">
         <p class="reel__intro" id="reelIntro">cinco estrellas <span aria-hidden="true">·</span> cinco servicios</p>
 
+        <!-- El copy del reel se lee EN MOVIMIENTO: título corto y una sola
+             línea. La progresión va 01 la marca existe · 02 se mueve · 03 se
+             mide · 04 se multiplica · 05 tiene casa propia. Donde el nombre
+             comercial es más largo que lo que se puede leer scrolleando, la
+             versión completa queda para lectores de pantalla. -->
         <ol class="svc-list">
           <li class="svc" data-svc="1">
             <span class="svc__num" aria-hidden="true"><i>01</i></span>
             <h2 class="svc__title">Identidad visual</h2>
             <span class="svc__rule" aria-hidden="true"></span>
-            <p class="svc__desc">Logotipo, sistema gráfico y manual de marca.</p>
+            <p class="svc__desc">Logo, sistema y manual. La marca queda parada sola.</p>
           </li>
           <li class="svc" data-svc="2">
             <span class="svc__num" aria-hidden="true"><i>02</i></span>
             <h2 class="svc__title">Producción audiovisual</h2>
             <span class="svc__rule" aria-hidden="true"></span>
-            <p class="svc__desc">Dirección, rodaje y post: spots, videoclips y contenido de marca.</p>
+            <p class="svc__desc">Dirección, rodaje y post. Después, se mueve.</p>
           </li>
           <li class="svc" data-svc="3">
             <span class="svc__num" aria-hidden="true"><i>03</i></span>
-            <h2 class="svc__title">Analítica de marketing, campañas y pautas</h2>
+            <h2 class="svc__title">
+              <span aria-hidden="true">Analítica y pauta</span>
+              <span class="u-sr">Analítica de marketing, campañas y pautas</span>
+            </h2>
             <span class="svc__rule" aria-hidden="true"></span>
-            <p class="svc__desc">Meta y Google Ads, medición y reportes que se entienden.</p>
+            <p class="svc__desc">Meta y Google Ads. Y números que se entienden.</p>
           </li>
           <li class="svc" data-svc="4">
             <span class="svc__num" aria-hidden="true"><i>04</i></span>
-            <h2 class="svc__title">Publicidad con IA · UGC</h2>
+            <h2 class="svc__title">
+              <span aria-hidden="true">IA <span class="svc__dot">·</span> UGC</span>
+              <span class="u-sr">Publicidad con IA y contenido UGC</span>
+            </h2>
             <span class="svc__rule" aria-hidden="true"></span>
-            <p class="svc__desc">Creativos UGC generados con IA para TikTok y Reels, a escala.</p>
+            <p class="svc__desc">Creativos UGC con IA para TikTok y Reels, a escala.</p>
           </li>
           <li class="svc" data-svc="5">
             <span class="svc__num" aria-hidden="true"><i>05</i></span>
-            <h2 class="svc__title">Desarrollo de diseño web</h2>
+            <h2 class="svc__title">
+              <span aria-hidden="true">Diseño web</span>
+              <span class="u-sr">Desarrollo de diseño web</span>
+            </h2>
             <span class="svc__rule" aria-hidden="true"></span>
-            <p class="svc__desc">Sitios rápidos, con movimiento y hechos a medida.</p>
+            <p class="svc__desc">Sitios rápidos, con movimiento, hechos a medida.</p>
           </li>
         </ol>
 
@@ -140,31 +181,31 @@
           <img src="assets/img/frame-01.jpg" alt="Una estrella roja en primer plano atravesando el humo" width="900" height="506" loading="lazy" decoding="async">
           <span class="lite__num" aria-hidden="true">01</span>
           <h2 class="lite__title">Identidad visual</h2>
-          <p class="lite__desc">Logotipo, sistema gráfico y manual de marca.</p>
+          <p class="lite__desc">Logo, sistema y manual. La marca queda parada sola.</p>
         </li>
         <li class="lite__item">
           <img src="assets/img/frame-02.jpg" alt="Destello blanco de una estrella cruzando el encuadre" width="900" height="506" loading="lazy" decoding="async">
           <span class="lite__num" aria-hidden="true">02</span>
           <h2 class="lite__title">Producción audiovisual</h2>
-          <p class="lite__desc">Dirección, rodaje y post: spots, videoclips y contenido de marca.</p>
+          <p class="lite__desc">Dirección, rodaje y post. Después, se mueve.</p>
         </li>
         <li class="lite__item">
           <img src="assets/img/frame-03.jpg" alt="Estrella roja de cinco puntas encendida en el centro del cuadro" width="900" height="506" loading="lazy" decoding="async">
           <span class="lite__num" aria-hidden="true">03</span>
           <h2 class="lite__title">Analítica de marketing, campañas y pautas</h2>
-          <p class="lite__desc">Meta y Google Ads, medición y reportes que se entienden.</p>
+          <p class="lite__desc">Meta y Google Ads. Y números que se entienden.</p>
         </li>
         <li class="lite__item">
           <img src="assets/img/frame-04.jpg" alt="Grupo de estrellas rojas volando en arco sobre el humo" width="900" height="506" loading="lazy" decoding="async">
           <span class="lite__num" aria-hidden="true">04</span>
           <h2 class="lite__title">Publicidad con IA · UGC</h2>
-          <p class="lite__desc">Creativos UGC generados con IA para TikTok y Reels, a escala.</p>
+          <p class="lite__desc">Creativos UGC con IA para TikTok y Reels, a escala.</p>
         </li>
         <li class="lite__item">
           <img src="assets/img/frame-05.jpg" alt="Estallido de luz roja al fundirse las cinco estrellas" width="900" height="506" loading="lazy" decoding="async">
           <span class="lite__num" aria-hidden="true">05</span>
           <h2 class="lite__title">Desarrollo de diseño web</h2>
-          <p class="lite__desc">Sitios rápidos, con movimiento y hechos a medida.</p>
+          <p class="lite__desc">Sitios rápidos, con movimiento, hechos a medida.</p>
         </li>
       </ol>
       <figure class="lite__end">
@@ -289,6 +330,16 @@
       <svg viewBox="0 0 100 100" class="hud__star"><path d="M50 3 L60.87 35.03 L94.7 35.48 L67.59 55.72 L77.62 88.02 L50 68.5 L22.38 88.02 L32.41 55.72 L5.3 35.48 L39.13 35.03 Z"/></svg>
     </span>
   </div>
+
+<!-- ============ FONDO AMBIENTAL ============
+     Una sola capa fija por detrás de todo el documento (z-index:-1):
+     radiales bordó que respiran por CSS + un canvas 2D con motas y
+     tres líneas finas que derivan. La construye buildAmbient(). -->
+<div class="amb" id="amb" aria-hidden="true">
+  <span class="amb__glow amb__glow--a"></span>
+  <span class="amb__glow amb__glow--b"></span>
+  <canvas class="amb__canvas" id="ambCanvas"></canvas>
+</div>
 
 <div class="grain" id="grain" aria-hidden="true"></div>
 

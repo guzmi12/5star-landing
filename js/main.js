@@ -31,10 +31,23 @@
 
   var hasGSAP = typeof window.gsap !== 'undefined' && typeof window.ScrollTrigger !== 'undefined';
 
+  // El reel tiene DOS implementaciones reales, no una y un fallback:
+  //   · escritorio  el scroll conduce el video fotograma a fotograma (scrub)
+  //   · táctil      el video se reproduce solo y el scroll conduce la copy,
+  //                 con un seek por servicio para caer en su estrella
+  // El scrub es caro; la reproducción, no. Por eso el número de núcleos ya
+  // no manda a nadie al modo estático en táctil: manda al reel mobile.
+  var MOBILE_REEL = COARSE || window.innerWidth < 900;
+
   var LITE;
   if (params.get('lite') === '1') LITE = true;
   else if (params.get('lite') === '0') LITE = false;
-  else LITE = REDUCED || SAVE_DATA || CORES <= 4 || (COARSE && TINY);
+  else if (params.get('reel') === 'mobile') LITE = false;
+  else LITE = REDUCED || SAVE_DATA || (!MOBILE_REEL && CORES <= 4);
+
+  // ?reel=mobile / ?reel=scrub fuerzan una u otra implementación para probar
+  if (params.get('reel') === 'mobile') MOBILE_REEL = true;
+  else if (params.get('reel') === 'scrub') MOBILE_REEL = false;
 
   /* ---------------------------------------------------------------------
      2. Ventanas de servicio, en SEGUNDOS DE VIDEO
@@ -76,6 +89,75 @@
     { in: 12.20, peak: 13.00, out: 13.80 }   // 05 · UNIFICACIÓN -> estallido -> lockup
   ];
 
+  /* ---------------------------------------------------------------------
+     2b. MAPA SCROLL ↔ VIDEO — dónde el scroll se toma su tiempo
+
+     Hasta acá el timeline era lineal: un segundo de video costaba siempre
+     el mismo scroll. Con 620vh para 20 s de video eso daba 31vh por
+     segundo, y como la ventana del servicio 03 dura 1,3 s, el texto entero
+     —número, título, línea y bajada— entraba y salía en 40vh de scroll. No
+     se llegaba a leer. Las tres primeras estrellas eran las peores porque
+     son las de ventana más corta.
+
+     La solución NO es alargar la sección (serían tres pantallas más de
+     scroll) ni meter pausas muertas. Es dejar de mapear linealmente: cada
+     tramo del video ocupa en el timeline una cantidad de unidades propia.
+     El video sigue corriendo a su velocidad natural dentro de cada tramo;
+     lo que cambia es cuánto scroll cuesta atravesarlo.
+
+       k > 1  el tramo se estira  -> hay tiempo de lectura
+       k < 1  el tramo se comprime -> el video vuela por lo que no dice nada
+
+     La suma da ~19,9 unidades contra las 20 de antes: la sección mantiene
+     su altura (720vh) y lo que cambia es el reparto. Las tres primeras
+     ventanas pasan de 56 / 53 / 40vh de scroll a 98 / 93 / 83vh.
+     --------------------------------------------------------------------- */
+  var SEGMENTS = [
+    { to: 3.20,  k: 0.50 },   // el humo antes de la primera estrella (era una pantalla entera)
+    { to: 5.00,  k: 1.75 },   // 01 · lectura
+    { to: 5.20,  k: 1.20 },   // tránsito
+    { to: 6.90,  k: 1.75 },   // 02 · lectura
+    { to: 8.20,  k: 2.05 },   // 03 · lectura (la ventana más corta del video)
+    { to: 9.80,  k: 1.35 },   // 04 · lectura
+    { to: 12.20, k: 0.45 },   // el video vuela hasta juntar las cinco estrellas
+    { to: 13.80, k: 1.35 },   // 05 · lectura
+    { to: 20.00, k: 0.62 }    // estallido + lockup: se mira, no se lee
+  ];
+
+  var MAP = [];        // tramos ya resueltos: {v0,v1,t0,t1}
+  var TL_DUR = 20;     // largo total del timeline, en unidades
+
+  function buildMap(dur) {
+    MAP.length = 0;
+    var v = 0, t = 0, i, v1, len;
+    for (i = 0; i < SEGMENTS.length; i++) {
+      v1 = Math.min(SEGMENTS[i].to, dur);
+      if (v1 <= v) continue;
+      len = (v1 - v) * SEGMENTS[i].k;
+      MAP.push({ v0: v, v1: v1, t0: t, t1: t + len });
+      v = v1; t += len;
+    }
+    if (v < dur) {                      // el video es más largo de lo previsto
+      len = (dur - v) * 0.62;
+      MAP.push({ v0: v, v1: dur, t0: t, t1: t + len });
+      t += len;
+    }
+    TL_DUR = t || dur;
+  }
+
+  // Segundo de video -> posición en el timeline
+  function T(v) {
+    for (var i = 0; i < MAP.length; i++) {
+      var m = MAP[i];
+      if (v <= m.v1 || i === MAP.length - 1) {
+        return m.t0 + (v - m.v0) / (m.v1 - m.v0) * (m.t1 - m.t0);
+      }
+    }
+    return TL_DUR;
+  }
+
+  buildMap(VIDEO_DUR);
+
   /* =====================================================================
      MODO ESTÁTICO — sin GSAP, dispositivo lento o movimiento reducido
      ===================================================================== */
@@ -88,6 +170,14 @@
 
     var video = q('#reelVideo');
     if (video) video.parentNode.removeChild(video);
+
+    // La antesala es puro movimiento de scroll: acá no tiene nada que decir
+    qa('.gate').forEach(function (g) { if (g.parentNode) g.parentNode.removeChild(g); });
+
+    // El fondo sí sobrevive: es barato y es lo que evita que el negro quede
+    // plano. Con movimiento reducido dibuja un solo cuadro y se detiene.
+    buildAmbient();
+    buildGrain();
 
     var constel = q('.constel');
     if (constel) constel.classList.add('constel--stack');
@@ -140,7 +230,9 @@
      Lenis — smooth scroll sólo en punteros finos (en táctil, scroll nativo)
      --------------------------------------------------------------------- */
   var lenis = null;
-  if (!COARSE && typeof window.Lenis !== 'undefined') {
+  // ?smooth=off deja el scroll nativo: útil para inspeccionar y para las
+  // capturas de control, donde el suavizado enmascara el estado real.
+  if (!COARSE && params.get('smooth') !== 'off' && typeof window.Lenis !== 'undefined') {
     lenis = new Lenis({ lerp: 0.085, wheelMultiplier: 1, smoothWheel: true, syncTouch: false });
     lenis.on('scroll', ScrollTrigger.update);
     gsap.ticker.add(function (time) { lenis.raf(time * 1000); });
@@ -184,10 +276,15 @@
   }
 
   /* ---------------------------------------------------------------------
-     GRANO DE PELÍCULA (una sola textura, animada por CSS · sólo escritorio)
+     GRANO DE PELÍCULA (una sola textura, animada por CSS)
+
+     Antes era exclusivo de escritorio y el celular quedaba con el negro
+     pelado. Ahora existe en todos lados, pero en táctil baja a un tercio de
+     opacidad y corre más lento: a 25 cm de los ojos el mismo valor se lee
+     como ruido digital en vez de como textura de película.
      --------------------------------------------------------------------- */
   function buildGrain() {
-    if (COARSE || REDUCED || window.innerWidth < 1024) return;
+    if (REDUCED) return;
     var size = 200;   // se muestra escalado por CSS -> textura fina, no manchas
     var c = document.createElement('canvas');
     c.width = c.height = size;
@@ -203,6 +300,199 @@
     ctx.putImageData(img, 0, 0);
     doc.style.setProperty('--grain-src', 'url(' + c.toDataURL('image/png') + ')');
     doc.classList.add('has-grain');
+    if (COARSE || window.innerWidth < 1024) doc.classList.add('grain--soft');
+  }
+
+  /* ---------------------------------------------------------------------
+     FONDO AMBIENTAL — canvas 2D detrás de todo el documento
+
+     El negro se sostenía solo con el contenido: fuera del reel la página era
+     una superficie plana. Este canvas le pone profundidad sin convertirse en
+     una demo de partículas:
+
+       · motas    puntos de 0,4-1,6 px que suben muy despacio. La densidad
+                  sale del área del viewport (tope 48 en escritorio, 22 en
+                  táctil) así que un celular nunca dibuja lo mismo que un
+                  monitor de 27".
+       · líneas   dos o tres trazos horizontales finísimos que cruzan el
+                  cuadro en un minuto largo.
+       · parallax cada mota tiene profundidad propia y el scroll las corre a
+                  distinto ritmo. Se envuelven por los bordes: la capa es
+                  fija, así que nunca hay salto ni scroll horizontal.
+
+     Los radiales bordó no están acá: los hace CSS (.amb__glow), que es más
+     barato que pintarlos por frame.
+
+     Corre en su propio requestAnimationFrame —no en el ticker de GSAP— para
+     que también funcione en el modo estático. A 30 fps en táctil, 60 en
+     escritorio; se detiene entero cuando la pestaña deja de verse y no se
+     mueve con `prefers-reduced-motion` (dibuja un cuadro y se queda ahí).
+     --------------------------------------------------------------------- */
+  function buildAmbient() {
+    var host = q('#amb');
+    var canvas = q('#ambCanvas');
+    if (!host || !canvas) return;
+
+    var ctx = canvas.getContext && canvas.getContext('2d');
+    if (!ctx) { if (host.parentNode) host.parentNode.removeChild(host); return; }
+
+    var W = 0, H = 0, dpr = 1;
+    var motes = [], lines = [];
+    var shift = 0;
+    var painted = false;
+
+    function wrap(v, max) { v = v % max; return v < 0 ? v + max : v; }
+
+    function density() {
+      var n = Math.round(window.innerWidth * window.innerHeight / 26000);
+      var cap = COARSE || window.innerWidth < 760 ? 22 : 48;
+      return Math.max(9, Math.min(cap, n));
+    }
+
+    function seed() {
+      var n = density(), i;
+      motes = new Array(n);
+      for (i = 0; i < n; i++) {
+        motes[i] = {
+          x: Math.random() * W,
+          y: Math.random() * H,
+          r: 0.4 + Math.random() * 1.2,
+          a: 0.05 + Math.random() * 0.15,
+          vx: (Math.random() - 0.5) * 6,
+          vy: -(2 + Math.random() * 6),        // suben, como ceniza al revés
+          d: 0.25 + Math.random() * 0.9,       // profundidad -> parallax
+          red: Math.random() < 0.26
+        };
+      }
+
+      var L = (COARSE || TINY) ? 2 : 3;
+      lines = new Array(L);
+      for (i = 0; i < L; i++) {
+        var lw = W * (0.22 + Math.random() * 0.3);
+        var g = ctx.createLinearGradient(0, 0, lw, 0);
+        var tint = i % 2 ? '145,0,5' : '242,239,233';
+        g.addColorStop(0, 'rgba(' + tint + ',0)');
+        g.addColorStop(0.5, 'rgba(' + tint + ',1)');
+        g.addColorStop(1, 'rgba(' + tint + ',0)');
+        lines[i] = {
+          y: Math.random() * H,
+          x: Math.random() * (W + lw) - lw,
+          w: lw,
+          v: (Math.random() < 0.5 ? -1 : 1) * (5 + Math.random() * 9),
+          a: 0.05 + Math.random() * 0.05,
+          d: 0.4 + Math.random() * 0.7,
+          g: g
+        };
+      }
+    }
+
+    function resize() {
+      W = window.innerWidth;
+      H = window.innerHeight;
+      if (!(W > 0 && H > 0)) return;
+      dpr = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.width = Math.round(W * dpr);
+      canvas.height = Math.round(H * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      seed();
+    }
+
+    function draw(dt) {
+      ctx.clearRect(0, 0, W, H);
+
+      var i, m, l, py, px;
+      for (i = 0; i < motes.length; i++) {
+        m = motes[i];
+        m.x += m.vx * dt;
+        m.y += m.vy * dt;
+        px = wrap(m.x, W);
+        py = wrap(m.y - shift * m.d, H);
+        ctx.globalAlpha = m.a;
+        ctx.fillStyle = m.red ? '#910005' : '#F2EFE9';
+        ctx.beginPath();
+        ctx.arc(px, py, m.r, 0, 6.283185);
+        ctx.fill();
+      }
+
+      for (i = 0; i < lines.length; i++) {
+        l = lines[i];
+        l.x += l.v * dt;
+        if (l.x > W) l.x = -l.w;
+        else if (l.x < -l.w) l.x = W;
+        py = wrap(l.y - shift * l.d, H);
+        ctx.globalAlpha = l.a;
+        ctx.save();
+        ctx.translate(l.x, py);
+        ctx.fillStyle = l.g;
+        ctx.fillRect(0, 0, l.w, 1);
+        ctx.restore();
+      }
+
+      ctx.globalAlpha = 1;
+      if (!painted) { painted = true; canvas.style.opacity = '1'; }
+    }
+
+    resize();
+    if (!(W > 0 && H > 0)) return;
+
+    // Primer cuadro sincrónico: el fondo existe desde el instante cero, sin
+    // esperar dos vueltas de rAF (y sin esperar nada si la pestaña arrancó
+    // en segundo plano, donde el navegador congela requestAnimationFrame).
+    draw(0);
+
+    if (REDUCED) {                       // un cuadro y nada más
+      doc.classList.add('amb-still');
+      return;
+    }
+
+    var FRAME = COARSE ? 1 / 30 : 1 / 61;
+    var raf = 0, last = 0, acc = 0;
+
+    function loop(t) {
+      raf = requestAnimationFrame(loop);
+      var dt = last ? (t - last) / 1000 : 0.016;
+      last = t;
+      if (dt > 0.1) dt = 0.1;              // pestaña que vuelve: no saltar
+      acc += dt;
+      if (acc < FRAME) return;
+      shift = (window.scrollY || window.pageYOffset || 0) * 0.05;
+      draw(acc);
+      acc = 0;
+    }
+
+    // start() siempre re-pide el frame en vez de salir si `raf` ya tiene un
+    // id: en una pestaña de fondo el id existe pero el callback no corre
+    // nunca, y sin esto la animación no volvía al primer plano.
+    function start() {
+      if (document.hidden) return;
+      if (raf) cancelAnimationFrame(raf);
+      last = 0; acc = 0;
+      raf = requestAnimationFrame(loop);
+      doc.classList.remove('amb-still', 'grain--still');
+    }
+    function stop() {
+      if (raf) cancelAnimationFrame(raf);
+      raf = 0;
+      doc.classList.add('amb-still', 'grain--still');
+    }
+
+    document.addEventListener('visibilitychange', function () {
+      if (document.hidden) stop(); else start();
+    });
+
+    var rt = 0;
+    window.addEventListener('resize', function () {
+      clearTimeout(rt);
+      rt = setTimeout(function () {
+        // Sólo si el viewport cambió de verdad: en iOS la barra de
+        // direcciones dispara resize en cada scroll y no queremos resembrar.
+        if (Math.abs(window.innerWidth - W) < 2 && Math.abs(window.innerHeight - H) < 90) return;
+        resize();
+      }, 220);
+    }, { passive: true });
+
+    if (document.hidden) doc.classList.add('amb-still', 'grain--still');
+    else start();
   }
 
   /* ---------------------------------------------------------------------
@@ -434,27 +724,100 @@
     });
   }
 
+
+  // Utilidad de verificación: mueve el scroll saltando el suavizado de Lenis.
+  // La usan las capturas de control; en uso normal nadie la llama.
+  function jumpScroll(y) {
+    if (lenis) lenis.scrollTo(y, { immediate: true, force: true });
+    else window.scrollTo(0, y);
+    ScrollTrigger.update();
+    return Math.round(window.scrollY);
+  }
+
   /* =====================================================================
-     C. EL REEL — el scroll ES el video
+     C. EL REEL
+
+     Dos implementaciones sobre el MISMO markup y el mismo video:
+
+       scrubReel()   escritorio. El scroll conduce video.currentTime.
+       mobileReel()  táctil. El video se reproduce solo y el scroll conduce
+                     la copy; cada servicio hace UN seek para caer sobre su
+                     estrella. Cinco seeks en toda la sección, no uno por
+                     frame: eso sí es confiable en iOS.
+
+     Todo lo común —elegir la fuente del video, el poster, desbloquear la
+     reproducción, la antesala, el HUD— vive en buildReel().
      ===================================================================== */
   function buildReel() {
     var video = q('#reelVideo');
     var media = q('#reelMedia');
-    var flare = q('#reelFlare');
-    var intro = q('#reelIntro');
-    var end = q('#reelEnd');
-    var hudStars = qa('.hud__star');
+    var poster = q('#reelPoster');
     var cards = qa('.svc');
 
     if (!video || !cards.length) return;
 
-    // Cargamos el video sólo en modo completo
+    // Un solo archivo por dispositivo: el liviano en táctil, pantallas
+    // angostas o ahorro de datos; el bueno en escritorio. Nunca los dos.
     if (!video.src) {
-      var useLight = COARSE || SAVE_DATA || window.innerWidth < 900;
+      var useLight = MOBILE_REEL || SAVE_DATA;
       var picked = (useLight && video.dataset.srcLight) ? video.dataset.srcLight : video.dataset.src;
       if (picked) video.src = picked;
     }
     video.muted = true;
+    video.setAttribute('muted', '');
+    // preload='none' en el HTML para que iOS no baje nada de arranque; acá
+    // pedimos lo que cada modo necesita realmente.
+    video.preload = MOBILE_REEL ? 'metadata' : 'auto';
+    // El atributo del HTML es preload='none'; cambiarlo por propiedad no
+    // siempre relanza la descarga, así que en escritorio la pedimos.
+    if (!MOBILE_REEL) { try { video.load(); } catch (e) {} }
+
+    // El poster deja de tapar recién cuando el video puede pintar.
+    var posterGone = false;
+    function dropPoster() {
+      if (posterGone || !poster) return;
+      // HAVE_CURRENT_DATA: recién acá hay un fotograma decodificado que
+      // pintar. Con readyState 1 el <video> ya tiene metadatos pero sigue
+      // siendo un rectángulo negro, y bajar el poster ahí es exactamente el
+      // agujero que queríamos evitar.
+      if (video.readyState < 2) return;
+      posterGone = true;
+      gsap.to(poster, { autoAlpha: 0, duration: 0.7, ease: 'power2.out' });
+    }
+    ['loadeddata', 'canplay', 'playing', 'seeked'].forEach(function (ev) {
+      video.addEventListener(ev, dropPoster, { once: true });
+    });
+    // Si el video no llega nunca (red caída, códec), el poster se queda:
+    // mejor un fotograma fijo que un rectángulo negro.
+    video.addEventListener('error', function () {
+      media.classList.add('is-fallback');
+    });
+
+    // iOS: un play/pause silencioso en el primer gesto habilita seek y play
+    var unlocked = false;
+    function unlock() {
+      if (unlocked) return;
+      unlocked = true;
+      var p = video.play();
+      if (p && p.then) {
+        p.then(function () { if (!MOBILE_REEL) video.pause(); dropPoster(); }).catch(function () {});
+      }
+    }
+    window.addEventListener('touchstart', unlock, { once: true, passive: true });
+    window.addEventListener('pointerdown', unlock, { once: true, passive: true });
+
+    if (MOBILE_REEL) mobileReel(video, media, cards, dropPoster);
+    else scrubReel(video, media, cards, dropPoster);
+  }
+
+  /* ---------------------------------------------------------------------
+     C.1 · ESCRITORIO — el scroll ES el video
+     --------------------------------------------------------------------- */
+  function scrubReel(video, media, cards, dropPoster) {
+    var flare = q('#reelFlare');
+    var intro = q('#reelIntro');
+    var end = q('#reelEnd');
+    var hudStars = qa('.hud__star');
 
     var state = { t: 0 };
 
@@ -469,10 +832,6 @@
       return t > VIDEO_DUR ? VIDEO_DUR : t;
     }
 
-    // Único camino para mover el video, compartido por el scrub y por el
-    // reconciliador. Consultamos readyState en cada seek en vez de fiarnos de
-    // un evento único: si el video todavía se estaba descargando, igual
-    // arranca solo al estar listo.
     function applySeek(t) {
       if (video.readyState < 1) return;             // HAVE_METADATA
       t = clampT(t);
@@ -504,6 +863,7 @@
 
     function onMeta() {
       if (video.duration && isFinite(video.duration)) VIDEO_DUR = video.duration;
+      buildMap(VIDEO_DUR);          // el mapa se recalcula sobre la duración real
       seek();
       ScrollTrigger.refresh();
     }
@@ -511,18 +871,6 @@
     video.addEventListener('loadeddata', seek, { once: true });
     video.addEventListener('canplay', seek, { once: true });
     if (video.readyState >= 1) onMeta();
-
-    // iOS: un play/pause silencioso habilita el seek en el primer gesto
-    var unlocked = false;
-    function unlock() {
-      if (unlocked) return;
-      unlocked = true;
-      var p = video.play();
-      if (p && p.then) p.then(function () { video.pause(); seek(); }).catch(function () {});
-      else { try { video.pause(); } catch (e) {} }
-    }
-    window.addEventListener('touchstart', unlock, { once: true, passive: true });
-    window.addEventListener('pointerdown', unlock, { once: true, passive: true });
 
     gsap.set(media, { '--vb': 1 });
     gsap.set(flare, { opacity: 0, scale: 0.75 });
@@ -536,21 +884,59 @@
         end: 'bottom bottom',
         pin: '#reelPin',
         pinSpacing: false,
-        scrub: COARSE ? 0.4 : 0.85,
+        scrub: 0.85,
         anticipatePin: 1,
         invalidateOnRefresh: true
       }
     });
 
-    // El motor: 0 → 20 s de video, un segundo de timeline = un segundo de video
-    tl.to(state, { t: VIDEO_DUR, duration: VIDEO_DUR, onUpdate: seek }, 0);
+    // El motor, tramo por tramo del mapa. Cada uno recorre su pedazo de
+    // video en las unidades de timeline que le tocaron.
+    MAP.forEach(function (m, i) {
+      tl.fromTo(state,
+        { t: m.v0 },
+        { t: m.v1, duration: m.t1 - m.t0, onUpdate: seek, immediateRender: i === 0 },
+        m.t0);
+    });
 
-    // Rótulo de apertura
+    // ---- LA ANTESALA ----
+    // El tramo de humo dejó de ser un vacío: es el momento en que el cuadro
+    // se abre. Todo termina antes de que entre el primer servicio.
+    var GATE_IN = T(3.20);
+    var gate = q('#reelGate');
+    if (gate && !REDUCED) {
+      var grid = q('.gate__grid', gate);
+      var bars = qa('.gate__bar', gate);
+      var arcSvg = q('.gate__arc', gate);
+      var arcPath = q('.gate__arc path', gate);
+      var out = Math.max(0.4, GATE_IN - 0.55);
+
+      tl.to(gate, { opacity: 1, duration: 0.20, ease: 'power2.out' }, 0.02)
+        .fromTo(grid, { opacity: 0 }, { opacity: 1, duration: 0.45, ease: 'power2.out' }, 0.04)
+        .fromTo(bars, { scaleX: 0 }, { scaleX: 1, duration: 0.62, ease: 'power3.out', stagger: 0.06 }, 0.10)
+        .to(arcSvg, { opacity: 0.5, duration: 0.35, ease: 'power2.out' }, 0.22);
+
+      if (HAS_DRAW) {
+        tl.fromTo(arcPath, { drawSVG: '0% 0%' },
+          { drawSVG: '0% 100%', duration: 0.92, ease: 'power1.inOut' }, 0.24);
+      }
+
+      tl.to(bars, { scaleX: 0, duration: 0.34, ease: 'power2.in', stagger: 0.05 }, out)
+        .to([grid, arcSvg], { opacity: 0, duration: 0.36, ease: 'power2.in' }, out)
+        .to(gate, { opacity: 0, duration: 0.30 }, out + 0.14);
+    }
+
+    // Rótulo de apertura: vive todo el tramo de humo y se va justo antes
+    // de que entre el 01.
     tl.fromTo(intro, { autoAlpha: 0, yPercent: 45 },
-      { autoAlpha: 1, yPercent: 0, duration: 0.75, ease: 'power3.out' }, 0.18)
-      .to(intro, { autoAlpha: 0, yPercent: -28, filter: 'blur(10px)', duration: 0.55, ease: 'power2.in' }, 1.20);
+      { autoAlpha: 1, yPercent: 0, duration: 0.60, ease: 'power3.out' }, 0.12)
+      .to(intro, { autoAlpha: 0, yPercent: -28, filter: 'blur(10px)', duration: 0.45, ease: 'power2.in' },
+        Math.max(0.7, GATE_IN - 0.45));
 
-    // Un bloque por estrella
+    // ---- UN BLOQUE POR ESTRELLA ----
+    // Las posiciones se piden al mapa: w.in/peak/out siguen expresados en
+    // segundos de video (que es como se leyó el video con ffprobe) y T() los
+    // traduce a la escala del timeline.
     WINDOWS.forEach(function (w, i) {
       var card = cards[i];
       if (!card) return;
@@ -559,45 +945,53 @@
       var rule = q('.svc__rule', card);
       var desc = q('.svc__desc', card);
 
-      // Las ventanas v4 son más cortas que las de v3 (la 03 dura 1.3 s contra
-      // los 2.35 s de antes): escalamos la entrada para que el título termine
-      // de formarse dentro de su propia ventana y no justo al salir.
-      var k = gsap.utils.clamp(0.62, 1, (w.out - w.in) / 1.8);
+      var tIn = T(w.in), tPeak = T(w.peak), tOut = T(w.out);
+      var span = tOut - tIn;
 
-      tl.set(card, { autoAlpha: 1 }, w.in)
+      // La entrada se escala con lo que dura la ventana YA ESTIRADA, no con
+      // su duración en el video: así el título termina de formarse en el
+      // primer tercio y los dos tercios restantes son lectura quieta.
+      var k = gsap.utils.clamp(0.7, 1.35, span / 2.6);
+
+      tl.set(card, { autoAlpha: 1 }, tIn)
         .fromTo(num, { yPercent: 118, skewY: 8 },
-          { yPercent: 0, skewY: 0, duration: 0.75 * k, ease: 'power4.out' }, w.in)
+          { yPercent: 0, skewY: 0, duration: 0.72 * k, ease: 'power4.out' }, tIn)
         .fromTo(title, { yPercent: 16, opacity: 0, filter: 'blur(18px)', skewY: 5 },
-          { yPercent: 0, opacity: 1, filter: 'blur(0px)', skewY: 0, duration: 1.0 * k, ease: 'power3.out' }, w.in + 0.10 * k)
-        .fromTo(rule, { scaleX: 0 }, { scaleX: 1, duration: 0.7 * k, ease: 'power2.out' }, w.in + 0.30 * k)
-        .fromTo(desc, { y: 24, opacity: 0 }, { y: 0, opacity: 1, duration: 0.7 * k, ease: 'power2.out' }, w.in + 0.42 * k);
+          { yPercent: 0, opacity: 1, filter: 'blur(0px)', skewY: 0, duration: 0.92 * k, ease: 'power3.out' }, tIn + 0.10 * k)
+        .fromTo(rule, { scaleX: 0 }, { scaleX: 1, duration: 0.66 * k, ease: 'power2.out' }, tIn + 0.28 * k)
+        .fromTo(desc, { y: 24, opacity: 0 }, { y: 0, opacity: 1, duration: 0.66 * k, ease: 'power2.out' }, tIn + 0.40 * k);
 
       // La estrella ilumina la copy: fogonazo + subida de brillo del video
-      tl.to(flare, { opacity: 0.9, scale: 1.25, duration: 0.30, ease: 'power2.out' }, w.peak - 0.28)
-        .to(flare, { opacity: 0, scale: 0.75, duration: 0.85, ease: 'power2.in' }, w.peak + 0.04)
-        .to(media, { '--vb': 1.6, duration: 0.28, ease: 'power2.out' }, w.peak - 0.26)
-        .to(media, { '--vb': 1, duration: 0.85, ease: 'power2.in' }, w.peak + 0.04);
+      tl.to(flare, { opacity: 0.9, scale: 1.25, duration: 0.30, ease: 'power2.out' }, tPeak - 0.28)
+        .to(flare, { opacity: 0, scale: 0.75, duration: 0.85, ease: 'power2.in' }, tPeak + 0.04)
+        .to(media, { '--vb': 1.6, duration: 0.28, ease: 'power2.out' }, tPeak - 0.26)
+        .to(media, { '--vb': 1, duration: 0.85, ease: 'power2.in' }, tPeak + 0.04);
 
       // HUD: la estrella nº i se enciende (y se apaga al subir)
       if (hudStars[i]) {
         tl.to(hudStars[i], {
           fill: 'rgba(145,0,5,1)', stroke: '#910005', scale: 1.35,
           duration: 0.35, ease: 'power2.out'
-        }, w.in)
-          .to(hudStars[i], { scale: 1, duration: 0.45, ease: 'power2.out' }, w.in + 0.35);
+        }, tIn)
+          .to(hudStars[i], { scale: 1, duration: 0.45, ease: 'power2.out' }, tIn + 0.35);
       }
 
-      // Salida
+      // Salida. Arranca 0.22 ANTES del out y dura menos de lo que tarda en
+      // entrar la siguiente: en las ventanas donde out(i) == in(i+1) —02→03 y
+      // 03→04— empezar justo en el out dejaba los dos títulos por encima de
+      // 0.8 al mismo tiempo, y como las .svc están una sobre la otra eso se
+      // lee como choque, no como disolvencia. Medido: el cruce peor pasa de
+      // 0.76+0.83 a un cross-fade donde la que sale ya va en bajada.
       tl.to([num, title, rule, desc], {
         opacity: 0, y: -30, filter: 'blur(9px)',
-        duration: 0.55, ease: 'power2.in', stagger: 0.035
-      }, w.out)
-        .set(card, { autoAlpha: 0 }, w.out + 0.75);
+        duration: 0.42, ease: 'power2.in', stagger: 0.03
+      }, tOut - 0.22)
+        .set(card, { autoAlpha: 0 }, tOut + 0.45);
     });
 
     // Cierre: el lockup del video (5 + estrella) queda solo en pantalla
     tl.fromTo(end, { autoAlpha: 0, yPercent: 45 },
-      { autoAlpha: 1, yPercent: 0, duration: 0.9, ease: 'power3.out' }, 18.10);
+      { autoAlpha: 1, yPercent: 0, duration: 0.8, ease: 'power3.out' }, T(18.10));
 
     // El indicador de progreso sólo existe mientras dura el reel
     var hud = q('#hud');
@@ -617,18 +1011,234 @@
     gsap.ticker.add(function () {
       if (!reelLive || video.readyState < 1) return;
       applySeek(state.t);
+      dropPoster();
     });
 
     // Sonda de verificación
     window.__fivestar = {
-      mode: 'full',
+      mode: 'full', reel: 'scrub',
+      reduced: REDUCED, cores: CORES, lenis: !!lenis,
+      windows: WINDOWS, map: MAP,
+      get progress() { var st = ScrollTrigger.getById('reel'); return st ? st.progress : 0; },
+      get videoTime() { return video.currentTime; },
+      get videoDuration() { return VIDEO_DUR; },
+      get timelineDuration() { return TL_DUR; },
+      get scrubTarget() { return state.t; },
+      jumpScroll: jumpScroll
+    };
+  }
+
+  /* ---------------------------------------------------------------------
+     C.2 · TÁCTIL — el video se reproduce, el scroll conduce la copy
+
+     Por qué no scrubeamos en el celular: el seek por frame necesita que el
+     decodificador responda a 60 pedidos por segundo mientras el dedo está
+     sobre la pantalla. En iOS eso o se congela o se traba, y encima obliga a
+     descargar el video entero antes de que se vea algo.
+
+     Acá el video se reproduce en bucle —barato, fluido, siempre hay imagen—
+     y el scroll maneja la copy. Para no perder la idea original (cada
+     servicio aparece con SU estrella) cada tarjeta dispara un único seek al
+     entrar, a un segundo antes del pico de su estrella. Son cinco seeks en
+     toda la sección: eso iOS lo hace sin despeinarse.
+     --------------------------------------------------------------------- */
+  function mobileReel(video, media, cards, dropPoster) {
+    var flare = q('#reelFlare');
+    var intro = q('#reelIntro');
+    var end = q('#reelEnd');
+    var hudStars = qa('.hud__star');
+
+    video.loop = true;
+
+    gsap.set(media, { '--vb': 1 });
+    gsap.set(flare, { opacity: 0, scale: 0.75 });
+
+    /* ---- reproducción: sólo mientras la sección está en pantalla ---- */
+    var wantPlay = false;
+    var visible = !document.hidden;
+
+    function sync() {
+      if (!video.src) return;
+      if (wantPlay && visible) {
+        if (video.paused) {
+          var p = video.play();
+          if (p && p.then) p.then(dropPoster).catch(function () {
+            // Autoplay bloqueado: el poster se queda puesto y el primer
+            // toque de la página lo destraba (ver unlock() en buildReel).
+          });
+        }
+      } else if (!video.paused) {
+        video.pause();
+      }
+    }
+
+    function onVisibility() { visible = !document.hidden; sync(); }
+    document.addEventListener('visibilitychange', onVisibility);
+
+    // Cargamos de verdad recién cuando la sección se acerca: en táctil el
+    // <video> arranca con preload='metadata' y no baja nada más hasta acá.
+    ScrollTrigger.create({
+      trigger: '.reel', start: 'top bottom+=40%', once: true,
+      onEnter: function () { video.preload = 'auto'; try { video.load(); } catch (e) {} }
+    });
+
+    var hud = q('#hud');
+    ScrollTrigger.create({
+      trigger: '.reel', start: 'top 90%', end: 'bottom 10%',
+      onToggle: function (self) {
+        wantPlay = self.isActive;
+        if (hud) hud.classList.toggle('is-live', self.isActive);
+        sync();
+      }
+    });
+
+    /* ---- un seek por servicio: cada tarjeta cae sobre su estrella ---- */
+    // cur guarda el paso ya servido para que un scroll nervioso no dispare
+    // el mismo seek dos veces. El paso -2 es el cierre (unificación).
+    var cur = -1;
+    function jumpTo(i) {
+      if (cur === i) return;
+      cur = i;
+      if (video.readyState < 1) return;
+      var t = i === -2 ? 14.2 : (i < 0 ? 0 : Math.max(0, WINDOWS[i].peak - 1.0));
+      try {
+        if (typeof video.fastSeek === 'function') video.fastSeek(t);
+        else video.currentTime = t;
+      } catch (e) { /* todavía no puede buscar; el bucle sigue igual */ }
+    }
+
+    /* ---- la copy, sobre el progreso del pin (timeline normalizado 0..1) ---- */
+    var tl = gsap.timeline({
+      defaults: { ease: 'none' },
+      scrollTrigger: {
+        id: 'reel',
+        trigger: '.reel',
+        start: 'top top',
+        end: 'bottom bottom',
+        pin: '#reelPin',
+        pinSpacing: false,
+        scrub: 0.45,
+        anticipatePin: 1,
+        invalidateOnRefresh: true
+      }
+    });
+
+    // Siete beats parejos en 280vh de scroll: ~40vh cada uno. Cada servicio
+    // tiene entrada, lectura quieta y salida, y la siguiente entra encima.
+    var STEP = 0.158;
+    var FIRST = 0.105;
+
+    tl.fromTo(intro, { autoAlpha: 0, yPercent: 40 },
+      { autoAlpha: 1, yPercent: 0, duration: 0.035, ease: 'power3.out' }, 0.008)
+      .to(intro, { autoAlpha: 0, yPercent: -22, filter: 'blur(8px)', duration: 0.03, ease: 'power2.in' },
+        FIRST - 0.028);
+
+    // La antesala, en versión corta: las barras abren el cuadro y se van.
+    var gate = q('#reelGate');
+    if (gate && !REDUCED) {
+      var bars = qa('.gate__bar', gate);
+      var arcSvg = q('.gate__arc', gate);
+      var arcPath = q('.gate__arc path', gate);
+
+      tl.to(gate, { opacity: 1, duration: 0.014 }, 0.004)
+        .fromTo(bars, { scaleX: 0 }, { scaleX: 1, duration: 0.05, ease: 'power3.out', stagger: 0.008 }, 0.01)
+        .to(arcSvg, { opacity: 0.45, duration: 0.03 }, 0.02);
+      if (HAS_DRAW) {
+        tl.fromTo(arcPath, { drawSVG: '0% 0%' },
+          { drawSVG: '0% 100%', duration: 0.07, ease: 'power1.inOut' }, 0.022);
+      }
+      tl.to(bars, { scaleX: 0, duration: 0.028, ease: 'power2.in' }, FIRST - 0.045)
+        .to([gate, arcSvg], { opacity: 0, duration: 0.03 }, FIRST - 0.038);
+    }
+
+    cards.forEach(function (card, i) {
+      var num = q('.svc__num i', card);
+      var title = q('.svc__title', card);
+      var rule = q('.svc__rule', card);
+      var desc = q('.svc__desc', card);
+
+      var a = FIRST + i * STEP;          // entrada
+      var b = a + STEP;                  // salida (la siguiente entra acá)
+      var ENT = STEP * 0.30;             // el texto se forma en el primer 30%
+
+      tl.call(jumpTo, [i], a - 0.02)
+        .set(card, { autoAlpha: 1 }, a)
+        .fromTo(num, { yPercent: 118, skewY: 8 },
+          { yPercent: 0, skewY: 0, duration: ENT * 0.8, ease: 'power4.out' }, a)
+        .fromTo(title, { yPercent: 14, opacity: 0, filter: 'blur(14px)' },
+          { yPercent: 0, opacity: 1, filter: 'blur(0px)', duration: ENT, ease: 'power3.out' }, a + ENT * 0.12)
+        .fromTo(rule, { scaleX: 0 }, { scaleX: 1, duration: ENT * 0.75, ease: 'power2.out' }, a + ENT * 0.3)
+        .fromTo(desc, { y: 18, opacity: 0 }, { y: 0, opacity: 1, duration: ENT * 0.75, ease: 'power2.out' }, a + ENT * 0.42);
+
+      // Fogonazo al terminar de entrar: el equivalente al pico de la estrella
+      tl.to(flare, { opacity: 0.65, scale: 1.15, duration: ENT * 0.5, ease: 'power2.out' }, a + ENT)
+        .to(flare, { opacity: 0, scale: 0.75, duration: STEP * 0.35, ease: 'power2.in' }, a + ENT * 1.5);
+
+      if (hudStars[i]) {
+        tl.to(hudStars[i], {
+          fill: 'rgba(145,0,5,1)', stroke: '#910005', scale: 1.3,
+          duration: ENT * 0.5, ease: 'power2.out'
+        }, a)
+          .to(hudStars[i], { scale: 1, duration: ENT * 0.6, ease: 'power2.out' }, a + ENT * 0.5);
+      }
+
+      tl.to([num, title, rule, desc], {
+        opacity: 0, y: -22, filter: 'blur(7px)',
+        duration: STEP * 0.26, ease: 'power2.in', stagger: 0.006
+      }, b - STEP * 0.20)
+        .set(card, { autoAlpha: 0 }, b + 0.006);
+    });
+
+    // Cierre: el lockup. Un último seek al tramo de la unificación.
+    var LAST = FIRST + cards.length * STEP;
+    tl.call(jumpTo, [-2], LAST - 0.03)
+      .fromTo(end, { autoAlpha: 0, yPercent: 40 },
+        { autoAlpha: 1, yPercent: 0, duration: 0.05, ease: 'power3.out' }, LAST);
+
+    window.__fivestar = {
+      mode: 'full', reel: 'mobile',
       reduced: REDUCED, cores: CORES, lenis: !!lenis,
       windows: WINDOWS,
       get progress() { var st = ScrollTrigger.getById('reel'); return st ? st.progress : 0; },
       get videoTime() { return video.currentTime; },
       get videoDuration() { return VIDEO_DUR; },
-      get scrubTarget() { return state.t; }
+      get paused() { return video.paused; },
+      get step() { return cur; },
+      jumpScroll: jumpScroll
     };
+  }
+
+  /* =====================================================================
+     C.3 · LA ANTESALA, MITAD HERO
+
+     La otra mitad vive dentro del reel (ver scrubReel/mobileReel). Acá, al
+     pie del hero, cuatro guías finas bajan y una línea bordó desciende
+     marcando por dónde va a entrar el video. Se abre y se cierra dentro del
+     mismo 100vh del hero, así que no agrega ni un píxel de scroll.
+     ===================================================================== */
+  function buildGate() {
+    if (REDUCED) return;
+    var gate = q('#heroGate');
+    if (!gate) return;
+
+    var rules = qa('i', q('.gate__rules', gate));
+    var drop = q('.gate__drop', gate);
+
+    gsap.timeline({
+      defaults: { ease: 'none' },
+      scrollTrigger: {
+        trigger: '.hero',
+        start: 'top top',
+        end: 'bottom top',
+        scrub: 0.5
+      }
+    })
+      .to(gate, { opacity: 1, duration: 0.26, ease: 'power2.out' }, 0)
+      .fromTo(rules, { scaleY: 0 },
+        { scaleY: 1, duration: 0.62, stagger: 0.07, ease: 'power2.out' }, 0.02)
+      .fromTo(drop, { scaleY: 0 },
+        { scaleY: 1, duration: 0.8, ease: 'power2.inOut' }, 0.06)
+      .to(gate, { opacity: 0, duration: 0.2, ease: 'power2.in' }, 0.8);
   }
 
   /* =====================================================================
@@ -1164,8 +1774,10 @@
      Arranque — ScrollTriggers creados de arriba hacia abajo
      ===================================================================== */
   function boot() {
+    buildAmbient();
     buildGrain();
     heroHandoff();
+    buildGate();
     buildReel();
     buildMarquee();
     buildConstel();

@@ -24,8 +24,14 @@
 
   /* Druk Wide es la display de marca; Anton queda de reemplazo mientras carga */
   --display:'Druk Wide','Anton','Haettenschweiler','Arial Narrow Bold',Impact,sans-serif;
-  /* Archivo es la sub-fuente de marca: grotesca editorial que sostiene a la Druk */
-  --sub:'Archivo',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+
+  /* Bricolage Grotesque es la sub-fuente: grotesca contemporánea con rarezas
+     propias (la cola de la g, el spur de la a, terminales cortados en diagonal)
+     y eje óptico variable, así que los textos chicos abren y los grandes
+     cierran solos. Contraste bajo y ancho normal: acompaña a la Druk sin
+     pelearle el registro display. Reemplaza a Archivo, que era correcta pero
+     no decía nada. */
+  --sub:'Bricolage Grotesque',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
   --sans:var(--sub);
 
   /* «5STAR» mide 5.172 em en Druk Wide; con la estrella y el gap, 5.49 em.
@@ -56,14 +62,28 @@ ol{list-style:none}
 img,svg,video{display:block;max-width:100%}
 a{color:inherit;text-decoration:none}
 
-html,body{background:var(--black)}
+/* El negro vive en el <html> para que la capa ambiental (z-index:-1, hija
+   del body) quede por encima del fondo y por debajo de todo el contenido. */
+html{background:var(--black)}
 body{
+  background:transparent;
   font-family:var(--sans);
   font-size:var(--fs-body);
-  line-height:1.5;
+  /* Bricolage tiene x-height alta: 1.45 respira sin abrirse de más. */
+  line-height:1.45;
+  letter-spacing:-.004em;
+  font-weight:400;
+  font-optical-sizing:auto;      /* el eje opsz de la variable, activado */
   color:var(--bone);
   overflow-x:hidden;
   -webkit-font-smoothing:antialiased;
+}
+/* Los micro-textos de interfaz van un punto más pesados: en 12-14px la
+   Bricolage a 400 pierde el carácter y a 500 lo recupera sin engordar. */
+.nav__links a,.hero__meta,.hero__cue,.preloader__label,
+.foot__meta,.hud__label,.mail__cue,.constel__hint{
+  font-weight:500;
+  font-variation-settings:'opsz' 14;
 }
 body.is-loading{overflow:hidden;height:100%}
 
@@ -149,7 +169,10 @@ html:not(.js) .preloader{display:none}
   position:fixed;inset:0 0 auto;z-index:60;
   display:flex;align-items:center;justify-content:space-between;
   gap:1rem;
-  padding:clamp(.9rem,2vw,1.6rem) var(--gutter);
+  padding:calc(clamp(.9rem,2vw,1.6rem) + env(safe-area-inset-top))
+          calc(var(--gutter) + env(safe-area-inset-right))
+          clamp(.9rem,2vw,1.6rem)
+          calc(var(--gutter) + env(safe-area-inset-left));
   mix-blend-mode:difference;
   will-change:transform;
 }
@@ -176,11 +199,20 @@ html:not(.js) .preloader{display:none}
 /* =========================================================
    HERO
    ========================================================= */
+/* El padding superior era `--sectionY * .75` (hasta 8.25rem): en ventanas
+   chatas empujaba el contenido y estiraba el hero hasta 130vh, que es de
+   dónde salía buena parte del vacío antes del reel. Ahora despeja el nav y
+   nada más, así el hero mide exactamente una pantalla y el video entra
+   apenas termina. */
 .hero{
   position:relative;
   min-height:100vh;min-height:100svh;
   display:grid;grid-template-rows:1fr auto;
-  padding:calc(var(--sectionY) * .75) var(--gutter) clamp(1.5rem,4vw,3rem);
+  padding:
+    calc(clamp(3.4rem,7vw,5.5rem) + env(safe-area-inset-top))
+    calc(var(--gutter) + env(safe-area-inset-right))
+    calc(clamp(1.4rem,3.6vw,2.6rem) + env(safe-area-inset-bottom))
+    calc(var(--gutter) + env(safe-area-inset-left));
   overflow:hidden;
 }
 /* blur(0px) explícito, no `none`: deja el desenfoque cero como estado de
@@ -231,6 +263,88 @@ html.js-motion .hero__word{
 .cue__text{display:block}
 
 /* =========================================================
+   LA ANTESALA — el pasaje del hero al video
+
+   Antes acá no había nada: el hero se desvanecía y el reel empezaba con
+   tres segundos de humo sin una sola palabra en pantalla. Ahora ese tramo
+   está compuesto en dos mitades que se dan la mano:
+
+   · gate--hero  guías finas que bajan desde el pie del hero + una línea
+                 bordó que desciende marcando por dónde va a entrar el video.
+   · gate--reel  la retícula que respira, dos barras que abren el cuadro
+                 como el obturador de una cámara y la estrella de la marca
+                 trazándose mientras el video sale del humo.
+
+   Las dos son decorativas puras (aria-hidden + pointer-events:none) y las
+   dos desaparecen antes de que entre el primer servicio: nunca compiten
+   con el video ni con la copy.
+   ========================================================= */
+.gate{position:absolute;pointer-events:none}
+
+.gate--hero{
+  left:0;right:0;bottom:0;
+  height:min(42vh,320px);
+  z-index:1;
+  overflow:hidden;
+  opacity:0;
+}
+.gate__rules{
+  position:absolute;inset:0;
+  display:flex;justify-content:space-between;
+  padding:0 var(--gutter);
+}
+.gate__rules i{
+  display:block;width:1px;height:100%;
+  background:linear-gradient(to bottom,rgba(242,239,233,0),rgba(242,239,233,.18));
+  transform:scaleY(0);transform-origin:top;
+}
+.gate__drop{
+  position:absolute;left:var(--gutter);top:0;
+  width:1px;height:100%;
+  background:linear-gradient(to bottom,rgba(145,0,5,0),rgba(145,0,5,.9));
+  transform:scaleY(0);transform-origin:top;
+}
+
+.gate--reel{
+  grid-area:1/1;
+  position:relative;
+  z-index:2;
+  overflow:hidden;
+  opacity:0;
+}
+/* Retícula apenas insinuada, desvanecida hacia los bordes por máscara para
+   que no se lea como una tabla pegada encima del video. */
+.gate__grid{
+  position:absolute;inset:0;
+  --cell:clamp(56px,7vw,104px);
+  background-image:
+    repeating-linear-gradient(to right,rgba(242,239,233,.11) 0 1px,transparent 1px var(--cell)),
+    repeating-linear-gradient(to bottom,rgba(242,239,233,.11) 0 1px,transparent 1px var(--cell));
+  -webkit-mask-image:radial-gradient(62% 58% at 50% 44%,#000 0%,rgba(0,0,0,.5) 50%,transparent 86%);
+  mask-image:radial-gradient(62% 58% at 50% 44%,#000 0%,rgba(0,0,0,.5) 50%,transparent 86%);
+  opacity:0;
+}
+.gate__bar{
+  position:absolute;left:10%;right:10%;height:1px;
+  background:linear-gradient(to right,transparent,rgba(242,239,233,.55) 22%,rgba(242,239,233,.55) 78%,transparent);
+  transform:scaleX(0);transform-origin:center;
+}
+.gate__bar--t{top:24%}
+.gate__bar--b{bottom:24%}
+.gate__arc{
+  position:absolute;left:50%;top:44%;
+  width:min(46vw,430px);height:auto;
+  transform:translate(-50%,-50%);
+  overflow:visible;
+  fill:none;
+  stroke:var(--bordeaux);
+  stroke-width:1.2;
+  vector-effect:non-scaling-stroke;
+  stroke-linejoin:round;stroke-linecap:round;
+  opacity:0;
+}
+
+/* =========================================================
    THE REEL — sección fijada, el scroll conduce el video
    ========================================================= */
 .reel{position:relative}
@@ -256,6 +370,19 @@ html.js-reel .reel__pin{
   will-change:filter;
 }
 .reel__video{width:100%;height:100%;object-fit:cover;background:var(--black)}
+/* Estado inicial estable: el mismo poster del <video>, pero como capa
+   propia. El atributo `poster` se cae en cuanto hay un fotograma; esta capa
+   la baja el JS recién cuando el video puede pintar, así entre la descarga
+   y el primer frame nunca queda un rectángulo negro. */
+.reel__poster{
+  position:absolute;inset:0;
+  background:#000 url('../assets/img/poster-hero.jpg') center/cover no-repeat;
+  pointer-events:none;
+}
+/* Si el <video> falla (red caída, códec no soportado) el poster se queda
+   puesto y la sección se lee igual: nunca un rectángulo negro. */
+.reel__media.is-fallback .reel__video{visibility:hidden}
+.reel__media.is-fallback .reel__poster{opacity:1!important;visibility:visible!important}
 .reel__scrim{
   position:absolute;inset:0;pointer-events:none;
   background:
@@ -283,7 +410,7 @@ html.js-reel .reel__pin{
   will-change:opacity,transform;
 }
 
-.reel__copy{grid-area:1/1;position:relative;min-height:0;pointer-events:none}
+.reel__copy{grid-area:1/1;position:relative;z-index:3;min-height:0;pointer-events:none}
 .reel__intro,.reel__end{
   position:absolute;left:var(--pad);right:var(--pad);bottom:var(--pad);
   font-family:var(--display);
@@ -321,6 +448,8 @@ html.js-reel .reel__pin{
   will-change:transform,filter,opacity;
   filter:blur(0px);   /* estado de reposo: el título entra desde blur(18px) y siempre vuelve a cero */
 }
+/* El separador de «IA · UGC» no es texto de lectura: pinta como marca */
+.svc__dot{color:var(--bordeaux)}
 .svc__rule{
   display:block;height:2px;width:min(300px,42%);
   background:var(--bordeaux);
@@ -420,7 +549,9 @@ html.js-reel .lite{display:none}
 /* =========================================================
    CONSTELACIÓN 5STAR — las cinco disciplinas orbitando la estrella
    ========================================================= */
-.constel{position:relative;background:var(--black)}
+/* Sin fondo propio: la sección deja pasar la capa ambiental. El campo de
+   estrellitas y el pentagrama siguen siendo suyos. */
+.constel{position:relative}
 html.js-constel .constel{height:240vh}
 .constel__pin{
   position:relative;
@@ -428,6 +559,7 @@ html.js-constel .constel{height:240vh}
   min-height:100vh;min-height:100svh;
   overflow:hidden;
 }
+.constel--stack .constel__pin{min-height:0}
 .constel__head{
   position:absolute;top:var(--pad);left:var(--pad);right:var(--pad);
   z-index:4;pointer-events:none;
@@ -588,7 +720,10 @@ html.js-constel .constel{height:240vh}
    ========================================================= */
 .contact{
   position:relative;
-  padding:var(--sectionY) var(--gutter) clamp(4rem,9vw,8rem);
+  padding:var(--sectionY)
+          calc(var(--gutter) + env(safe-area-inset-right))
+          clamp(4rem,9vw,8rem)
+          calc(var(--gutter) + env(safe-area-inset-left));
   overflow:hidden;
   isolation:isolate;
 }
@@ -684,7 +819,10 @@ html.js-constel .constel{height:240vh}
 .foot{
   display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;
   gap:1.2rem clamp(1rem,4vw,3rem);
-  padding:clamp(1.6rem,4vw,3rem) var(--gutter) clamp(2.2rem,5vw,3.5rem);
+  padding:clamp(1.6rem,4vw,3rem)
+          calc(var(--gutter) + env(safe-area-inset-right))
+          calc(clamp(2.2rem,5vw,3.5rem) + env(safe-area-inset-bottom))
+          calc(var(--gutter) + env(safe-area-inset-left));
   border-top:1px solid var(--hair);
 }
 .foot__mark{min-height:44px}
@@ -733,7 +871,73 @@ html.has-cursor,html.has-cursor *{cursor:none}
 }
 
 /* =========================================================
-   GRANO DE PELÍCULA (solo escritorio)
+   FONDO AMBIENTAL — el negro deja de ser plano
+
+   Una sola capa fija por detrás de todo el documento. Vive en z-index:-1
+   siendo hija del <body>: se pinta después del fondo del <html> y antes de
+   cualquier contenido en flujo, así que ninguna sección la tapa y ningún
+   texto pierde contraste. Tres estratos:
+
+     1. dos radiales bordó de opacidad muy baja que derivan por CSS
+     2. un canvas 2D con motas y tres líneas finas (lo dibuja buildAmbient)
+     3. el grano de película, que sigue viviendo aparte en .grain
+
+   Nada de esto captura eventos y nada de esto crece con el scroll: la capa
+   es fija y el parallax lo hace el propio canvas moviendo sus motas.
+   ========================================================= */
+.amb{
+  position:fixed;inset:0;
+  z-index:-1;
+  pointer-events:none;
+  overflow:hidden;
+  contain:strict;      /* nada de acá adentro puede provocar layout afuera */
+}
+.amb__canvas{
+  position:absolute;inset:0;
+  display:block;width:100%;height:100%;
+  opacity:0;           /* lo levanta el JS cuando ya dibujó el primer cuadro */
+  transition:opacity 1.1s ease;
+}
+.amb__glow{
+  position:absolute;display:block;
+  border-radius:50%;
+  will-change:transform;
+}
+.amb__glow--a{
+  left:-20vw;top:2vh;
+  width:min(80vw,940px);aspect-ratio:1;
+  background:radial-gradient(circle closest-side,
+    rgba(145,0,5,.15) 0%,rgba(145,0,5,.055) 44%,rgba(145,0,5,0) 74%);
+  animation:ambDriftA 46s ease-in-out infinite alternate;
+}
+.amb__glow--b{
+  right:-26vw;bottom:-14vh;
+  width:min(92vw,1080px);aspect-ratio:1;
+  background:radial-gradient(circle closest-side,
+    rgba(145,0,5,.11) 0%,rgba(96,0,3,.05) 42%,rgba(145,0,5,0) 72%);
+  animation:ambDriftB 63s ease-in-out infinite alternate;
+}
+@keyframes ambDriftA{
+  from{transform:translate3d(0,0,0) scale(1)}
+  to{transform:translate3d(7vw,9vh,0) scale(1.12)}
+}
+@keyframes ambDriftB{
+  from{transform:translate3d(0,0,0) scale(1.06)}
+  to{transform:translate3d(-9vw,-7vh,0) scale(.94)}
+}
+
+/* Con la pestaña en segundo plano el JS suspende el canvas; los radiales
+   los para esta clase, que también se pone en `prefers-reduced-motion`. */
+html.amb-still .amb__glow{animation-play-state:paused}
+
+@media (prefers-reduced-motion:reduce){
+  .amb__glow{animation:none}
+  .amb__glow--a{opacity:.75}
+  .amb__glow--b{opacity:.75}
+}
+
+/* =========================================================
+   GRANO DE PELÍCULA
    ========================================================= */
 .grain{
   position:fixed;inset:-160px;z-index:90;pointer-events:none;
@@ -752,6 +956,13 @@ html.has-grain .grain{
   opacity:.042;
   animation:grainShift .56s steps(8) infinite;
 }
+/* En táctil el grano existe pero baja: la pantalla está a 25 cm de los ojos
+   y a .042 se lee como ruido digital en vez de como textura de película. */
+html.has-grain.grain--soft .grain{
+  opacity:.026;
+  animation-duration:.78s;
+}
+html.grain--still .grain{animation-play-state:paused}
 @keyframes grainShift{
   0%{transform:translate3d(0,0,0)}
   12.5%{transform:translate3d(-38px,22px,0)}
@@ -765,33 +976,24 @@ html.has-grain .grain{
 }
 
 /* =========================================================
-   RENDIMIENTO — saltear el render de lo que no está en pantalla
+   RENDIMIENTO — por qué acá NO hay content-visibility
 
-   content-visibility:auto le deja al navegador saltear layout y pintado de
-   las secciones fuera del viewport. contain-intrinsic-size:auto reserva el
-   alto real de la última vez que se pintó, así que la barra de scroll no
-   salta y ScrollTrigger sigue midiendo bien.
+   El hero y el contacto tenían `content-visibility:auto` con
+   `contain-intrinsic-size:auto 100vh`. Medido en Chrome, ese par les sumaba
+   altura de verdad: el tamaño intrínseco se aplica al content box y el
+   padding de la sección se suma ENCIMA, así que el hero crecía 117px y el
+   contacto 312px sobre lo que realmente ocupaba su contenido.
 
-   NO se aplica a .reel ni a .marquee: el reel está fijado todo el tramo y
-   el marquee corre en bucle aunque esté fuera de cuadro.
+   Esos 117px eran, literalmente, la primera mitad del vacío entre el hero y
+   el video: una franja de negro muerto que no era ni hero ni reel y que
+   ningún margen explicaba. (La otra mitad estaba adentro del reel: tres
+   segundos de humo sin una palabra en pantalla; eso lo resuelven el mapa de
+   SEGMENTS y la antesala.)
+
+   La ganancia de saltear el render de dos secciones tan simples no compensa
+   un bug de layout que además le desordena las medidas a ScrollTrigger. El
+   reel y el marquee nunca lo tuvieron; ahora tampoco lo tiene nadie.
    ========================================================= */
-.hero,
-.contact{
-  content-visibility:auto;
-  contain-intrinsic-size:auto 100vh;
-}
-
-/* La constelación sólo puede contenerse cuando NO está fijada.
-   content-visibility implica `contain:paint`, y el paint containment
-   convierte al elemento en bloque contenedor de sus descendientes
-   position:fixed — que es exactamente como ScrollTrigger fija .constel__pin
-   sobre el scroller del body. Con la órbita activa (html.js-constel) el pin
-   quedaría anclado a la sección en vez de al viewport y se rompería.
-   En apilado no hay pin, que además es el modo de los equipos lentos. */
-html:not(.js-constel) .constel{
-  content-visibility:auto;
-  contain-intrinsic-size:auto 100vh;
-}
 
 /* =========================================================
    ESTADOS INICIALES CONTROLADOS POR JS
@@ -808,22 +1010,68 @@ html.js-motion .reel__end{visibility:hidden;opacity:0}
    RESPONSIVE
    ========================================================= */
 
-/* Retrato angosto: el video se muestra entero (banda 16:9) y la copy vive debajo */
-@media (orientation:portrait) and (max-width:900px){
-  html.js-reel .reel{height:470vh}
+/* ---------------------------------------------------------
+   MOBILE · el reel a pantalla completa
+
+   Antes el video vivía acá como una banda 16:9 flotando en el medio con la
+   copy debajo — y en la práctica ni se veía, porque el modo estático se
+   comía el reel entero antes de llegar a este CSS. Ahora el video ocupa la
+   pantalla completa (cover) y la copy va encima, sobre un degradado que le
+   garantiza contraste. El reel deja de scrubear y pasa a reproducirse solo:
+   ver mobileReel() en main.js.
+   --------------------------------------------------------- */
+@media (max-width:900px){
+  /* 380svh = 100 del pin + 280 de recorrido. Siete beats de ~44vh cada uno:
+     intro, los cinco servicios y el cierre. Es un tercio menos de pin que el
+     scrub de escritorio y aun así cada tarjeta tiene tiempo de lectura. */
+  html.js-reel .reel{height:380vh;height:380svh}
+  /* svh y no dvh: con dvh el pin cambia de alto cada vez que iOS esconde la
+     barra de direcciones y el pin tiembla. svh es el mínimo estable. */
   html.js-reel .reel__pin{
-    grid-template-rows:auto minmax(0,1fr);
-    align-content:center;
-    gap:clamp(1rem,4vw,2rem);
+    grid-template-columns:100%;
+    grid-template-rows:100%;
+    height:100vh;height:100svh;
   }
-  .reel__media{grid-area:1/1;height:auto;aspect-ratio:16/9}
-  .reel__video{object-fit:contain}
-  .reel__scrim{background:linear-gradient(to top,rgba(0,0,0,.55),transparent 60%)}
+  .reel__media{grid-area:1/1;width:100%;height:100%;aspect-ratio:auto}
+  .reel__video{object-fit:cover}
+  .reel__copy{grid-area:1/1}
+  /* Full-bleed vertical: el peso del degradado va abajo, donde vive la copy */
+  .reel__scrim{
+    background:
+      linear-gradient(to top,rgba(0,0,0,.94) 0%,rgba(0,0,0,.78) 22%,rgba(0,0,0,.30) 48%,rgba(0,0,0,0) 72%),
+      linear-gradient(to bottom,rgba(0,0,0,.55) 0%,rgba(0,0,0,0) 26%);
+  }
   .reel__media::after{display:none}
-  .reel__copy{grid-area:2/1}
   .svc__title{max-width:none}
-  .hud{left:var(--pad);right:auto}
-  .svc-list,.reel__intro,.reel__end{bottom:calc(var(--pad) + 2.6rem)}
+  .svc__desc{max-width:30ch}
+  .svc__rule{width:min(200px,55%)}
+  /* La copy despeja el HUD y el notch inferior */
+  .svc-list,.reel__intro,.reel__end{
+    bottom:calc(var(--pad) + 3.2rem + env(safe-area-inset-bottom));
+  }
+  .hud{
+    left:calc(var(--pad) + env(safe-area-inset-left));right:auto;
+    bottom:calc(var(--pad) + env(safe-area-inset-bottom));
+  }
+  /* La antesala se simplifica: la retícula desaparece y quedan las barras */
+  .gate__grid{display:none}
+  .gate__arc{width:min(74vw,340px)}
+}
+
+/* Apaisado en un celular: sobra ancho y falta alto. La copy se achica y sube
+   el peso del degradado izquierdo para que el texto no se coma la imagen. */
+@media (max-width:900px) and (orientation:landscape) and (max-height:520px){
+  html.js-reel .reel{height:320vh;height:320svh}
+  .svc-list,.reel__intro,.reel__end{
+    right:auto;width:min(56vw,520px);
+    bottom:calc(var(--pad) + env(safe-area-inset-bottom));
+  }
+  .reel__scrim{
+    background:
+      linear-gradient(to right,rgba(0,0,0,.9) 0%,rgba(0,0,0,.55) 34%,rgba(0,0,0,0) 66%),
+      linear-gradient(to top,rgba(0,0,0,.7),rgba(0,0,0,0) 46%);
+  }
+  .hud{display:none}
 }
 
 @media (max-width:640px){
@@ -854,7 +1102,9 @@ html.js-motion .reel__end{visibility:hidden;opacity:0}
     transition-duration:.001ms !important;
     scroll-behavior:auto !important;
   }
-  html.has-grain .grain{animation:none;opacity:.04}
+  html.has-grain .grain{animation:none;opacity:.032}
+  /* La antesala es 100% movimiento: sin movimiento no tiene nada que decir */
+  .gate{display:none}
   .preloader{display:none}
   /* Nada queda velado ni hueco: blur cero y el 5STAR sólido. */
   .hero__inner,.svc__title,.hero__word{filter:blur(0px)}
